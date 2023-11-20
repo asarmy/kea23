@@ -42,14 +42,15 @@ def load_data(style):
     Command-line interface usage
         Run (e.g.) `python data.py --style normal`
         Run `python data.py --help`
-        NOTE: CLI is not useful for this application (loading coeffs) but included for completeness.
+        #NOTE: CLI is not useful for this application (loading coeffs) but included for completeness.
     """
 
     if style in FILENAMES:
-        fn = FILENAMES[style]
-        ffp = DIR_DATA / fn
-        df = pd.read_csv(ffp)
-        print(f"Model coefficients successfully loaded for {style} faulting.")
+        filename = FILENAMES[style]
+        filepath = DIR_DATA / filename
+        df = pd.read_csv(filepath)
+        df = df.rename(columns={"Unnamed: 0": "model_number"})
+        # print(f"Model coefficients successfully loaded for {style} faulting.")
         return df
     else:
         raise ValueError(MSG.format(style=style))
@@ -61,8 +62,10 @@ def main():
         description="Load model coefficients based on style of faulting."
     )
     parser.add_argument(
+        "-s",
         "--style",
         required=True,
+        type=str,
         help="Style of faulting (case-sensitive). Valid options are 'strike-slip', 'reverse', or 'normal'.",
     )
     args = parser.parse_args()
