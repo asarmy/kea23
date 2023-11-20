@@ -36,6 +36,13 @@ def load_data(style):
     ------
     ValueError
         If the provided `style` is not one of the supported styles.
+
+    Notes
+    ------
+    Command-line interface usage
+        Run (e.g.) `python data.py --style normal`
+        Run `python data.py --help`
+        NOTE: CLI is not useful for this application (loading coeffs) but included for completeness.
     """
 
     if style in FILENAMES:
@@ -56,7 +63,7 @@ def main():
     parser.add_argument(
         "--style",
         required=True,
-        help="Choose 'strike-slip', 'reverse', or 'normal' (case-sensitive).",
+        help="Style of faulting (case-sensitive). Valid options are 'strike-slip', 'reverse', or 'normal'.",
     )
     args = parser.parse_args()
 
@@ -68,7 +75,8 @@ def main():
         return
 
     try:
-        load_data(style)
+        data = load_data(style)
+        print(data)
     except ValueError as e:
         print(e)
 
