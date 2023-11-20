@@ -1,0 +1,7 @@
+# Ignore my scratch files
+Spreadsheets/
+**/blah*
+**/working*
+
+# Ignore pycaches
+**/__pycache__/
