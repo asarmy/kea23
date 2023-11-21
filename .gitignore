@@ -1,7 +1,8 @@
 # Ignore my scratch files
 Spreadsheets/
-**/blah*
+**/scratch*
 **/working*
+**/blah*
 
 # Ignore pycaches
 **/__pycache__/
