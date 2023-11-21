@@ -1,3 +1,16 @@
+"""This file runs the KEA23 displacement model for a single scenario.
+- A single scenario is defined as one magnitude, one u_star location, one style, and one percentile.
+- The results are returned in a pandas dataframe.
+- Results for the location, its complement, and folded location are always returned.
+- The mean model (i.e., mean coefficients) is run by default, but results for all coefficients can be computed.
+- Command-line use is supported; try `python run_displacement_model.py --help`
+- Module use is supported; try `from run_displacement_model import run_model`
+
+# NOTE: Several helper functions are defined herein, but the main function is `run_model()`.
+
+Reference: https://doi.org/10.1177/ToBeAssigned
+"""
+
 # Python imports
 import argparse
 import sys
@@ -31,7 +44,6 @@ def _calculate_mean_coefficients(coefficients):
 
 def _calculate_distribution_parameters(*, magnitude, location, style, coefficients):
     """ """
-
     function_map = {"strike-slip": func_ss, "reverse": func_rv, "normal": func_nm}
 
     # NOTE: Check for appropriate style is handled in `run_model`
@@ -47,7 +59,7 @@ def _calculate_Y(*, mu, sigma, lam, percentile):
         D = ((lam * mu + 1) ** (1 / lam)) * (
             1 + (sigma**2 * (1 - lam)) / (2 * (lam * mu + 1) ** 2)
         )
-        # NOTE: Analytical soluion is in meters, so convery back to Y transform for consistency
+        # NOTE: Analytical soluion is in meters, so convert back to Y transform for consistency
         Y = (D**lam - 1) / lam
     else:
         Y = stats.norm.ppf(percentile, loc=mu, scale=sigma)
@@ -79,22 +91,22 @@ COEFFS_MEAN_DICT = {
 
 def run_model(magnitude, location, style, percentile, mean_model=True):
     """
-    Run displacement model for a single scenario.
+    Run KEA23 displacement model for a single scenario.
 
     Parameters
     ----------
     magnitude : float
-        Earthquake moment magnitude.
+        Earthquake moment magnitude. Only one value allowed.
 
     location : float
-        Normalized location along rupture length, range [0, 1.0].
+        Normalized location along rupture length, range [0, 1.0]. Only one value allowed.
 
     style : str
-        Style of faulting (case-sensitive).
-        Valid options are 'strike-slip', 'reverse', or 'normal'.
+        Style of faulting (case-sensitive). Valid options are 'strike-slip', 'reverse', or
+        'normal'. Only one value allowed.
 
     percentile : float
-        Percentile value. Use -1 for mean.
+        Percentile value. Use -1 for mean. Only one value allowed.
 
     mean_model : bool, optional
         If True, use mean coefficients. If False, use full coefficients. Default True.
@@ -109,15 +121,15 @@ def run_model(magnitude, location, style, percentile, mean_model=True):
         - 'percentile': Percentile value [from user input].
         - 'model_number': Model coefficient row number. Returns -1 for mean model.
         - 'lambda': Box-Cox transformation parameter.
-        - 'mu_site': Median transformed displacement for the site.
-        - 'sigma_site': Standard deviation transformed displacement for the site.
-        - 'mu_complement': Median transformed displacement for the complementary site.
-        - 'sigma_complement': Standard deviation transformed displacement for the complementary site.
-        - 'Y_site': Transformed displacement for the site.
-        - 'Y_complement': Transformed displacement for the complementary site.
+        - 'mu_site': Median transformed displacement for the location.
+        - 'sigma_site': Standard deviation transformed displacement for the location.
+        - 'mu_complement': Median transformed displacement for the complementary location.
+        - 'sigma_complement': Standard deviation transformed displacement for the complementary location.
+        - 'Y_site': Transformed displacement for the location.
+        - 'Y_complement': Transformed displacement for the complementary location.
         - 'Y_folded': Transformed displacement for the folded location.
-        - 'displ_site': Displacement in meters for the site.
-        - 'displ_complement': Displacement in meters for the complementary site.
+        - 'displ_site': Displacement in meters for the location.
+        - 'displ_complement': Displacement in meters for the complementary location.
         - 'displ_folded': Displacement in meters for the folded location.
 
     Raises
@@ -147,8 +159,8 @@ def run_model(magnitude, location, style, percentile, mean_model=True):
             f"Unsupported style '{style}'. Supported styles are 'strike-slip', 'reverse', and 'normal' (case-sensitive)."
         )
 
-    # Check for only one M,L,SOF scenario
-    for variable in [magnitude, location]:
+    # Check for only one scenario
+    for variable in [magnitude, location, percentile]:
         if not isinstance(variable, (float, int, np.int32)):
             raise TypeError(
                 f"Expected a float or int, got '{variable}', which is a {type(variable).__name__}."
@@ -219,48 +231,72 @@ def run_model(magnitude, location, style, percentile, mean_model=True):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="My Model Runner")
+    description_text = """Run KEA23 displacement model for a single scenario.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A DataFrame with the following columns:
+        - 'magnitude': Earthquake moment magnitude [from user input].
+        - 'location':  Normalized location along rupture length [from user input].
+        - 'style': Style of faulting [from user input].
+        - 'percentile': Percentile value [from user input].
+        - 'model_number': Model coefficient row number. Returns -1 for mean model.
+        - 'lambda': Box-Cox transformation parameter.
+        - 'mu_site': Median transformed displacement for the location.
+        - 'sigma_site': Standard deviation transformed displacement for the location.
+        - 'mu_complement': Median transformed displacement for the complementary location.
+        - 'sigma_complement': Standard deviation transformed displacement for the complementary location.
+        - 'Y_site': Transformed displacement for the location.
+        - 'Y_complement': Transformed displacement for the complementary location.
+        - 'Y_folded': Transformed displacement for the folded location.
+        - 'displ_site': Displacement in meters for the location.
+        - 'displ_complement': Displacement in meters for the complementary location.
+        - 'displ_folded': Displacement in meters for the folded location.
+    """
+
+    parser = argparse.ArgumentParser(
+        description=description_text, formatter_class=argparse.RawTextHelpFormatter
+    )
     parser.add_argument(
         "-m",
         "--magnitude",
         required=True,
         type=float,
-        help="Earthquake magnitude",
+        help="Earthquake moment magnitude. Only one value allowed.",
     )
     parser.add_argument(
         "-l",
         "--location",
         required=True,
         type=float,
-        help="Normalized position along rupture.",
+        help="Normalized location along rupture length, range [0, 1.0]. Only one value allowed.",
     )
     parser.add_argument(
         "-s",
         "--style",
         required=True,
         type=str,
-        help="Style of faulting (case-sensitive). Valid options are 'strike-slip', 'reverse', or 'normal'.",
+        help="Style of faulting (case-sensitive). Valid options are 'strike-slip', 'reverse', or 'normal'. Only one value allowed.",
     )
-
     parser.add_argument(
         "-p",
         "--percentile",
         required=True,
         type=float,
-        help="Percentile. Use -1 for mean.",
+        help=" Percentile value. Use -1 for mean. Only one value allowed.",
     )
-
     parser.add_argument(
         "--mean_model",
         dest="mean_model",
         action="store_true",
-        help="Use mean model coefficients (default)",
+        help="Use mean model coefficients (default).",
     )
     parser.add_argument(
         "--no-mean_model",
         dest="mean_model",
         action="store_false",
-        help="Use full model coefficients",
+        help="Use full model coefficients.",
     )
     parser.set_defaults(mean_model=True)
 
