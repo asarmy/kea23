@@ -6,3 +6,10 @@ Spreadsheets/
 
 # Ignore pycaches
 **/__pycache__/
+
+# Ignore R history files
+**/.Rhistory
+
+# Ignore Notebook outputs
+examples/*.csv
+examples/*.png

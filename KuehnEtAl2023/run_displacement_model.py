@@ -68,7 +68,11 @@ def _calculate_Y(*, mu, sigma, lam, percentile):
 
 def _calculate_displacement(*, predicted_Y, lam):
     """ """
-    return (predicted_Y * lam + 1) ** (1 / lam)
+    displacement = (predicted_Y * lam + 1) ** (1 / lam)
+
+    # Check for values that are too small to calculate
+    displacement = 0 if np.isnan(displacement).all() else displacement
+    return displacement
 
 
 # Preliminaries before defining `run_model`

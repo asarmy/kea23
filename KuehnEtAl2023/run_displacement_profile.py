@@ -1,6 +1,6 @@
 """This file runs the KEA23 displacement model to create slip profile for a single scenario.
 - A single scenario is defined as one magnitude, one style, and one percentile.
-- The mean model(i.e., mean coefficients) are used.
+- The mean model(i.e., mean coefficients) is used.
 - The results are returned in a pandas dataframe.
 - Results for left-peak, right-peak, and folded (symmetrical) profiles are always returned.
 - Command-line use is supported; try `python run_displacement_profile.py --help`
@@ -61,6 +61,7 @@ def run_profile(magnitude, style, percentile, location_step=0.05):
         - 'location':  Normalized location along rupture length [generated from location_step].
         - 'style': Style of faulting [from user input].
         - 'percentile': Percentile value [from user input].
+        - 'model_number': Model coefficient row number. Returns -1 for mean model.
         - 'lambda': Box-Cox transformation parameter.
         - 'mu_left': Median transformed displacement for the left-peak profile.
         - 'sigma_left': Standard deviation transformed displacement for the left-peak profile.
@@ -79,12 +80,12 @@ def run_profile(magnitude, style, percentile, location_step=0.05):
         If the provided `style` is not one of the supported styles.
 
     TypeError
-        If more than one value is provided for `magnitude`, `location`, `style`, or `percentile`.
+        If more than one value is provided for `magnitude`, `style`, or `percentile`.
 
     Notes
     ------
     Command-line interface usage
-        Run (e.g.) `python run_displacement_profile.py --magnitude 7 --location 0.5 --style strike-slip --percentile 0.5`
+        Run (e.g.) `python run_displacement_profile.py --magnitude 7 --style strike-slip --percentile 0.5 -step 0.01`
         Run `python run_displacement_profile.py --help`
 
     #TODO
@@ -141,6 +142,7 @@ def main():
         - 'location':  Normalized location along rupture length [generated from location_step].
         - 'style': Style of faulting [from user input].
         - 'percentile': Percentile value [from user input].
+        - 'model_number': Model coefficient row number. Returns -1 for mean model.
         - 'lambda': Box-Cox transformation parameter.
         - 'mu_left': Median transformed displacement for the left-peak profile.
         - 'sigma_left': Standard deviation transformed displacement for the left-peak profile.
@@ -178,7 +180,6 @@ def main():
         type=float,
         help="Percentile value. Use -1 for mean. Only one value allowed.",
     )
-
     parser.add_argument(
         "-step",
         "--location_step",
