@@ -1,18 +1,16 @@
+# Python imports
 import sys
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import pytest
 
 # Add path for module
+# FIXME: shouldn't need this with a package install (`__init__` should suffice)
 PROJ_DIR = Path(__file__).resolve().parents[3]
 sys.path.append(str(PROJ_DIR))
 
-# Add path for expected outputs
-SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.append(str(SCRIPT_DIR.parent))
-
+# Module imports
 from KuehnEtAl2023.data import load_data
 from KuehnEtAl2023.functions import (
     func_mu,
@@ -21,11 +19,15 @@ from KuehnEtAl2023.functions import (
     func_rv,
 )
 
-
 # Test setup
 RTOL = 2e-2
 
-# Load the expected outputs
+# Add path for expected outputs
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.append(str(SCRIPT_DIR.parent))
+
+
+# Load the expected outputs, run tests
 @pytest.fixture
 def results_data():
     ffp = SCRIPT_DIR / "expected_output" / "reverse_mean-model.csv"
@@ -74,9 +76,7 @@ def test_reverse_mean_model(results_data):
             sd_tot_calc,
         ]
 
-        for (func_name, expected, computed) in zip(
-            func_names, expected_values, computed_values
-        ):
+        for (func_name, expected, computed) in zip(func_names, expected_values, computed_values):
             np.testing.assert_allclose(
                 expected,
                 computed,

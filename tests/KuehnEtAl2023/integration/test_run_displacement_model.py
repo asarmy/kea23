@@ -1,29 +1,31 @@
+# Python imports
 import sys
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import pytest
 
 # Add path for module
+# FIXME: shouldn't need this with a package install (`__init__` should suffice)
 PROJ_DIR = Path(__file__).resolve().parents[3]
 sys.path.append(str(PROJ_DIR))
+
+# Module imports
+from KuehnEtAl2023.run_displacement_model import run_model
+
+# Test setup
+RTOL = 2e-2
 
 # Add path for expected outputs
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.append(str(SCRIPT_DIR.parent))
 
-from KuehnEtAl2023.run_displacement_model import run_model
 
-
-# Test setup
-RTOL = 2e-2
-
-# Load the expected outputs
+# Load the expected outputs, run tests
 @pytest.fixture
 def results_data():
     ffp = SCRIPT_DIR / "expected_output" / "displacement_mean-model.csv"
-    dtype = [float, float, float, 'U20'] + [float] * 10
+    dtype = [float, float, float, "U20"] + [float] * 10
     return np.genfromtxt(ffp, delimiter=",", skip_header=1, dtype=dtype)
 
 
@@ -34,7 +36,7 @@ def test_run_model(results_data):
         location = row[1]
         percentile = row[2]
         style = row[3]
-        
+
         # Expected
         mu_loc_expect = row[4]
         sd_loc_expect = row[5]
@@ -46,16 +48,14 @@ def test_run_model(results_data):
         displ_site_expect = row[11]
         displ_compl_expect = row[12]
         displ_folded_expect = row[13]
-    
+
         # Computed
-        
         results = run_model(
-        magnitude=magnitude,
-        location=location,
-        style=style,
-        percentile=percentile,
-    )
-    
+            magnitude=magnitude,
+            location=location,
+            style=style,
+            percentile=percentile,
+        )
         mu_loc_calc = results["mu_site"]
         sd_loc_calc = results["sigma_site"]
         mu_compl_calc = results["mu_complement"]
@@ -66,7 +66,8 @@ def test_run_model(results_data):
         displ_site_calc = results["displ_site"]
         displ_compl_calc = results["displ_complement"]
         displ_folded_calc = results["displ_folded"]
-        
+
+        # Tests
         expected_values = [
             mu_loc_expect,
             sd_loc_expect,
@@ -92,13 +93,10 @@ def test_run_model(results_data):
             displ_folded_calc,
         ]
 
-        for (expected, computed) in zip(
-            expected_values, computed_values
-        ):
+        for (expected, computed) in zip(expected_values, computed_values):
             np.testing.assert_allclose(
                 expected,
                 computed,
                 rtol=RTOL,
                 err_msg=f"Mag {magnitude}, u-star {location}, style {style}, percentile {percentile}, Expected: {expected}, Computed: {computed}",
             )
-        

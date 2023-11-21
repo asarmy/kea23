@@ -1,6 +1,6 @@
+# Python imports
 import argparse
 import sys
-from itertools import product
 from pathlib import Path
 
 import numpy as np
@@ -8,14 +8,15 @@ import pandas as pd
 from scipy import stats
 
 # Add path for module
-#FIXME: shouldn't need this with a package install (`__init__` should suffice)
+# FIXME: shouldn't need this with a package install (`__init__` should suffice)
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.append(str(SCRIPT_DIR))
 
-
-from functions import func_nm, func_rv, func_ss
+# Module imports
 from data import load_data
+from functions import func_nm, func_rv, func_ss
 
+# Adjust display for readability
 pd.set_option("display.max_columns", 50)
 pd.set_option("display.width", 500)
 
@@ -42,7 +43,9 @@ def _calculate_distribution_parameters(*, magnitude, location, style, coefficien
 def _calculate_Y(*, mu, sigma, percentile):
     """ """
     if percentile == -1:
+        # BUG: This calculation is incorrect!
         Y = mu + np.square(sigma) / 2
+        # Y = np.nan
     else:
         Y = stats.norm.ppf(percentile, loc=mu, scale=sigma)
     return Y
@@ -73,7 +76,7 @@ COEFFS_MEAN_DICT = {
 
 def run_model(magnitude, location, style, percentile, mean_model=True):
     """
-    Run displacement model for a single scenario. 
+    Run displacement model for a single scenario.
 
     Parameters
     ----------
@@ -86,10 +89,10 @@ def run_model(magnitude, location, style, percentile, mean_model=True):
     style : str
         Style of faulting (case-sensitive).
         Valid options are 'strike-slip', 'reverse', or 'normal'.
-        
+
     percentile : float
         Percentile value. Use -1 for mean.
-        
+
     mean_model : bool, optional
         If True, use mean coefficients. If False, use full coefficients. Default True.
 
@@ -113,12 +116,12 @@ def run_model(magnitude, location, style, percentile, mean_model=True):
         - 'displ_site': Displacement in meters for the site.
         - 'displ_complement': Displacement in meters for the complementary site.
         - 'displ_folded': Displacement in meters for the folded location.
-        
+
     Raises
     ------
     ValueError
         If the provided `style` is not one of the supported styles.
-    
+
     TypeError
         If more than one value is provided for `magnitude`, `location`, `style`, or `percentile`.
 
@@ -127,14 +130,14 @@ def run_model(magnitude, location, style, percentile, mean_model=True):
     Command-line interface usage
         Run (e.g.) `python run_displacement_model.py --magnitude 7 --location 0.5 --style strike-slip --percentile 0.5`
         Run `python run_displacement_model.py --help`
-        
+
     #TODO
     ------
     Raise a ValueError for invalid location
     Raise a ValueError for invalid percentile.
     Raise a UserWarning for magntiudes outside recommended ranges.
     """
-    
+
     # Check style
     if style not in COEFFS_DICT:
         raise ValueError(
@@ -174,9 +177,7 @@ def run_model(magnitude, location, style, percentile, mean_model=True):
 
     # Calculate Y (transformed displacement)
     Y_site = _calculate_Y(mu=mu_site, sigma=sigma_site, percentile=percentile)
-    Y_complement = _calculate_Y(
-        mu=mu_complement, sigma=sigma_complement, percentile=percentile
-    )
+    Y_complement = _calculate_Y(mu=mu_complement, sigma=sigma_complement, percentile=percentile)
     Y_folded = np.mean([Y_site, Y_complement], axis=0)
 
     # Calculate displacement in meters
@@ -270,10 +271,8 @@ def main():
         results = run_model(magnitude, location, style, percentile, mean_model)
         print(results)
 
-        ## Prompt to save results to CSV
-        save_option = (
-            input("Do you want to save the results to a CSV (yes/no)? ").strip().lower()
-        )
+        # Prompt to save results to CSV
+        save_option = input("Do you want to save the results to a CSV (yes/no)? ").strip().lower()
 
         if save_option in ["y", "yes"]:
             file_path = input("Enter filepath to save results: ").strip()
