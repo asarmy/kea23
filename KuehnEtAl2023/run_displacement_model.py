@@ -40,12 +40,15 @@ def _calculate_distribution_parameters(*, magnitude, location, style, coefficien
     return mu, sigma
 
 
-def _calculate_Y(*, mu, sigma, percentile):
+def _calculate_Y(*, mu, sigma, lam, percentile):
     """ """
     if percentile == -1:
-        # BUG: This calculation is incorrect!
-        Y = mu + np.square(sigma) / 2
-        # Y = np.nan
+        # NOTE: Analytical solution from https://robjhyndman.com/hyndsight/backtransforming/
+        D = ((lam * mu + 1) ** (1 / lam)) * (
+            1 + (sigma**2 * (1 - lam)) / (2 * (lam * mu + 1) ** 2)
+        )
+        # NOTE: Analytical soluion is in meters, so convery back to Y transform for consistency
+        Y = (D**lam - 1) / lam
     else:
         Y = stats.norm.ppf(percentile, loc=mu, scale=sigma)
     return Y
@@ -176,12 +179,14 @@ def run_model(magnitude, location, style, percentile, mean_model=True):
     )
 
     # Calculate Y (transformed displacement)
-    Y_site = _calculate_Y(mu=mu_site, sigma=sigma_site, percentile=percentile)
-    Y_complement = _calculate_Y(mu=mu_complement, sigma=sigma_complement, percentile=percentile)
+    lam = coeffs["lambda"]
+    Y_site = _calculate_Y(mu=mu_site, sigma=sigma_site, lam=lam, percentile=percentile)
+    Y_complement = _calculate_Y(
+        mu=mu_complement, sigma=sigma_complement, lam=lam, percentile=percentile
+    )
     Y_folded = np.mean([Y_site, Y_complement], axis=0)
 
     # Calculate displacement in meters
-    lam = coeffs["lambda"]
     displ_site = _calculate_displacement(predicted_Y=Y_site, lam=lam)
     displ_complement = _calculate_displacement(predicted_Y=Y_complement, lam=lam)
     displ_folded = _calculate_displacement(predicted_Y=Y_folded, lam=lam)
