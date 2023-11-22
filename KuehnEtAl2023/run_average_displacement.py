@@ -1,7 +1,7 @@
 """This file runs the KEA23 displacement model to calculate the average displacement that is implied by the model prediction for a single scenario.
 - A single scenario is defined as one magnitude and one style.
 - The model-implied Average Displacement is calculated as the area under the mean slip profile.
-- The mean model(i.e., mean coefficients) is used.
+- The mean model (i.e., mean coefficients) is used.
 - The results are returned in a pandas dataframe.
 - Command-line use is supported; try `python run_average_displacement.py --help`
 - Module use is supported; try `from run_average_displacement import run_ad`
@@ -36,7 +36,7 @@ pd.set_option("display.width", 500)
 def run_ad(magnitude, style):
     """
     Run KEA23 displacement model to calculate the average displacement that is implied by the model
-    prediction for a single scenario. The mean model (i.e., mean coefficients) are used.
+    prediction for a single scenario. The mean model (i.e., mean coefficients) is used.
 
     Parameters
     ----------
@@ -91,7 +91,9 @@ def run_ad(magnitude, style):
 
     # NOTE: Check for appropriate style is handled upstream
 
-    # Calculate mean slip profile (note `percentile=-1` is used for mean)
+    # Calculate mean slip profile
+    # NOTE: `percentile=-1` is used for mean
+    # NOTE: `location_step=0.01` is used to create well-descritized profile for intergration
     results = run_profile(magnitude=magnitude, style=style, percentile=-1, location_step=0.01)
 
     # Calculate area under the mean slip profile; this is the Average Displacement (AD)

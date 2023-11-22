@@ -1,6 +1,6 @@
 """This file runs the KEA23 displacement model to create slip profile for a single scenario.
 - A single scenario is defined as one magnitude, one style, and one percentile.
-- The mean model(i.e., mean coefficients) is used.
+- The mean model (i.e., mean coefficients) is used.
 - The results are returned in a pandas dataframe.
 - Results for left-peak, right-peak, and folded (symmetrical) profiles are always returned.
 - Command-line use is supported; try `python run_displacement_profile.py --help`
@@ -36,7 +36,7 @@ pd.set_option("display.width", 500)
 def run_profile(magnitude, style, percentile, location_step=0.05):
     """
     Run KEA23 displacement model to create slip profile for a single scenario. The mean model
-    (i.e., mean coefficients) are used.
+    (i.e., mean coefficients) is used.
 
     Parameters
     ----------
