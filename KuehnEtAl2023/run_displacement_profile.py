@@ -115,7 +115,7 @@ def run_profile(magnitude, style, percentile, location_step=0.05):
     locations = np.arange(0, 1 + location_step, location_step).tolist()
 
     # Calculations
-    dataframe = pd.DataFrame()
+    run_results = []
     for location in locations:
         results = run_model(
             magnitude=magnitude,
@@ -124,7 +124,9 @@ def run_profile(magnitude, style, percentile, location_step=0.05):
             percentile=percentile,
             mean_model=True,
         )
-        dataframe = pd.concat([dataframe, results])
+        run_results.append(results)
+
+    dataframe = pd.concat(run_results, ignore_index=True)
 
     return dataframe
 

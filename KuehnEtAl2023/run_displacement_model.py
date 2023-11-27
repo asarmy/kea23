@@ -68,11 +68,11 @@ def _calculate_Y(*, mu, sigma, lam, percentile):
 
 def _calculate_displacement(*, predicted_Y, lam):
     """ """
-    displacement = (predicted_Y * lam + 1) ** (1 / lam)
+    D = (predicted_Y * lam + 1) ** (1 / lam)
 
     # Check for values that are too small to calculate
-    displacement = 0 if np.isnan(displacement).all() else displacement
-    return displacement
+    D = 0 if np.isnan(D).all() else D
+    return D
 
 
 # Preliminaries before defining `run_model`
@@ -183,6 +183,9 @@ def run_model(magnitude, location, style, percentile, mean_model=True):
     else:
         coeffs = COEFFS_DICT.get(style)
 
+    # NOTE: Coefficients are pandas dataframes; convert here to recarray for faster computations
+    coeffs = coeffs.to_records(index=False)
+
     # Get distribution parameters for site and complement
     mu_site, sigma_site = _calculate_distribution_parameters(
         magnitude=magnitude, location=location, style=style, coefficients=coeffs
@@ -209,27 +212,46 @@ def run_model(magnitude, location, style, percentile, mean_model=True):
 
     # Create a DataFrame
     n = len(coeffs)
-    dataframe = pd.concat(
-        [
-            pd.Series(np.repeat(magnitude, n), name="magnitude"),
-            pd.Series(np.repeat(location, n), name="location"),
-            pd.Series(np.repeat(style, n), name="style"),
-            pd.Series(np.repeat(percentile, n), name="percentile"),
-            coeffs["model_number"],
-            lam,
-            mu_site.rename("mu_site"),
-            sigma_site.rename("sigma_site"),
-            mu_complement.rename("mu_complement"),
-            sigma_complement.rename("sigma_complement"),
-            pd.Series(Y_site, name="Y_site"),
-            pd.Series(Y_complement, name="Y_complement"),
-            pd.Series(Y_folded, name="Y_folded"),
-            pd.Series(displ_site, name="displ_site"),
-            pd.Series(displ_complement, name="displ_complement"),
-            pd.Series(displ_folded, name="displ_folded"),
-        ],
-        axis=1,
+
+    col_vals = (
+        np.repeat(magnitude, n),
+        np.repeat(location, n),
+        np.repeat(style, n),
+        np.repeat(percentile, n),
+        coeffs["model_number"],
+        lam,
+        mu_site,
+        sigma_site,
+        mu_complement,
+        sigma_complement,
+        Y_site,
+        Y_complement,
+        Y_folded,
+        displ_site,
+        displ_complement,
+        displ_folded,
     )
+
+    cols_dict = {
+        "magnitude": float,
+        "location": float,
+        "style": object,
+        "percentile": float,
+        "model_number": int,
+        "lambda": float,
+        "mu_site": float,
+        "sigma_site": float,
+        "mu_complement": float,
+        "sigma_complement": float,
+        "Y_site": float,
+        "Y_complement": float,
+        "Y_folded": float,
+        "displ_site": float,
+        "displ_complement": float,
+        "displ_folded": float,
+    }
+    dataframe = pd.DataFrame(np.column_stack(col_vals), columns=cols_dict.keys())
+    dataframe = dataframe.astype(cols_dict)
 
     return dataframe
 

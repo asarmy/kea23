@@ -1,5 +1,6 @@
 # Python imports
 import numpy as np
+import pandas as pd
 
 # Model constants
 MAG_BREAK, DELTA = 7.0, 0.1
@@ -54,8 +55,16 @@ def func_sd_mode_sigmoid(coefficients, magnitude):
 def func_sd_u(coefficients, location):
     # Used only for strike-slip and reverse
     # Column name2 for stdv coefficients "s_" varies for style of faulting, fix that here
-    s_1 = coefficients["s_s1"] if "s_s1" in coefficients.columns else coefficients["s_r1"]
-    s_2 = coefficients["s_s2"] if "s_s2" in coefficients.columns else coefficients["s_r2"]
+    if isinstance(coefficients, pd.DataFrame):
+        s_1 = coefficients["s_s1"] if "s_s1" in coefficients.columns else coefficients["s_r1"]
+        s_2 = coefficients["s_s2"] if "s_s2" in coefficients.columns else coefficients["s_r2"]
+    elif isinstance(coefficients, np.recarray):
+        s_1 = coefficients["s_s1"] if "s_s1" in coefficients.dtype.names else coefficients["s_r1"]
+        s_2 = coefficients["s_s2"] if "s_s2" in coefficients.dtype.names else coefficients["s_r2"]
+    else:
+        raise TypeError(
+            "Function arguement for model coefficients must be Pandas DataFrame or NumPy RecArray."
+        )
 
     alpha = coefficients["alpha"]
     beta = coefficients["beta"]
