@@ -1,16 +1,20 @@
-"""This file runs the KEA23 displacement model to create a slip profile for a single scenario.
+"""This file runs the PEA11 principal fault displacement model to create a slip profile for a
+single scenario.
 - A single scenario is defined as one magnitude, one style, and one percentile.
-- The mean model (i.e., mean coefficients) is used.
 - The results are returned in a pandas DataFrame.
-- Results for left-peak, right-peak, and folded (symmetrical) profiles are always returned.
+- Only the principal fault displacement models for direct (i.e., not normalized) predictions are
+implemented herein currently.
 - Command-line use is supported; try `python run_displacement_profile.py --help`
 - Module use is supported; try `from run_displacement_profile import run_profile`
 
 # NOTE: This script just loops over locations in `run_displacement_model.py`
 
-Reference: https://doi.org/10.1177/ToBeAssigned
-"""
+Reference: https://doi.org/10.1785/0120100035
 
+# TODO: There is a potential issue with the bilinear model. Because the standard deviation changes
+across l/L', there is a weird step in any profile that is not median. Confirm this is a model
+issue and not misunderstanding in implementation.
+"""
 
 # Python imports
 import argparse
@@ -26,29 +30,33 @@ MODEL_DIR = Path(__file__).resolve().parents[1]
 sys.path.append(str(MODEL_DIR))
 
 # Module imports
-from KuehnEtAl2023.run_displacement_model import run_model
+from PetersenEtAl2011.run_displacement_model import run_model
 
 # Adjust display for readability
 pd.set_option("display.max_columns", 50)
 pd.set_option("display.width", 500)
 
 
-def run_profile(magnitude, style, percentile, location_step=0.05):
+def run_profile(
+    magnitude, percentile, submodel="elliptical", style="strike-slip", location_step=0.05
+):
     """
-    Run KEA23 displacement model to create slip profile for a single scenario. The mean model
-    (i.e., mean coefficients) is used.
+    Run PEA11 principal fault displacement model to create slip profile for a single scenario.
 
     Parameters
     ----------
     magnitude : float
         Earthquake moment magnitude. Only one value allowed.
 
-    style : str
-        Style of faulting (case-sensitive). Valid options are 'strike-slip', 'reverse', or
-        'normal'. Only one value allowed.
-
     percentile : float
         Percentile value. Use -1 for mean. Only one value allowed.
+
+    submodel : str, optional
+        PEA11 shape model name. Default is 'elliptical'. Valid options are 'elliptical',
+        'quadratic', or 'bilinear'. Only one value allowed.
+
+    style : str, optional
+        Style of faulting (case-sensitive). Default is "strike-slip". Only one value allowed.
 
     location_step : float, optional
         Profile step interval in percentage. Default 0.05.
@@ -61,31 +69,25 @@ def run_profile(magnitude, style, percentile, location_step=0.05):
         - 'location':  Normalized location along rupture length [generated from location_step].
         - 'style': Style of faulting [from user input].
         - 'percentile': Percentile value [from user input].
-        - 'model_number': Model coefficient row number. Returns -1 for mean model.
-        - 'lambda': Box-Cox transformation parameter.
-        - 'mu_left': Mean transformed displacement for the left-peak profile.
-        - 'sigma_left': Standard deviation transformed displacement for the left-peak profile.
-        - 'mu_right': Mean transformed displacement for the right-peak profile.
-        - 'sigma_right': Standard deviation transformed displacement for the right-peak profile.
-        - 'Y_left': Transformed displacement for the left-peak profile.
-        - 'Y_right': Transformed displacement for the right-peak profile.
-        - 'Y_folded': Transformed displacement for the folded (symmetrical) profile.
-        - 'displ_left': Displacement in meters for the left-peak profile.
-        - 'displ_right': Displacement in meters for the right-peak profile.
-        - 'displ_folded': Displacement in meters for the folded (symmetrical) profile.
+        - 'model_name': Profile shape model name [from user input].
+        - 'mu': Natural log transform of mean displacement in cm.
+        - 'sigma': Standard deviation in same units as `mu`.
+        - 'displ': Displacement in meters.
 
     Raises
     ------
-    ValueError
-        If the provided `style` is not one of the supported styles.
-
     TypeError
-        If more than one value is provided for `magnitude`, `style`, or `percentile`.
+        If more than one value is provided for `magnitude`, `submodel`, `style`, or `percentile`.
+
+    Warns
+    -----
+    UserWarning
+        If an unsupported `style` is provided.
 
     Notes
     ------
     Command-line interface usage
-        Run (e.g.) `python run_displacement_profile.py --magnitude 7 --style strike-slip --percentile 0.5 -step 0.01`
+        Run (e.g.) `python run_displacement_profile.py --magnitude 7 --percentile 0.5 -shape bilinear -step 0.01`
         Run `python run_displacement_profile.py --help`
 
     #TODO
@@ -109,6 +111,12 @@ def run_profile(magnitude, style, percentile, location_step=0.05):
             f"(In other words, only one value is allowed; check you have not entered a list or array.)"
         )
 
+    if not isinstance(submodel, (str)):
+        raise TypeError(
+            f"Expected a string, got '{submodel}', which is a {type(submodel).__name__}."
+            f"(In other words, only one value is allowed; check you have not entered a list or array.)"
+        )
+
     # NOTE: Check for appropriate style is handled in `run_model`
 
     # Create profile location array
@@ -120,9 +128,9 @@ def run_profile(magnitude, style, percentile, location_step=0.05):
         results = run_model(
             magnitude=magnitude,
             location=location,
-            style=style,
             percentile=percentile,
-            mean_model=True,
+            submodel=submodel,
+            style=style,
         )
         run_results.append(results)
 
@@ -132,30 +140,21 @@ def run_profile(magnitude, style, percentile, location_step=0.05):
 
 
 def main():
-    description_text = """Run KEA23 displacement model to create slip profile for a single scenario.
-    The mean model (i.e., mean coefficients) are used.
+    description_text = """Run PEA11 principal fault displacement model to create slip profile for
+    a single scenario.
 
     Returns
     -------
     pandas.DataFrame
-        A DataFpandas.DataFrame
         A DataFrame with the following columns:
         - 'magnitude': Earthquake moment magnitude [from user input].
         - 'location':  Normalized location along rupture length [generated from location_step].
         - 'style': Style of faulting [from user input].
         - 'percentile': Percentile value [from user input].
-        - 'model_number': Model coefficient row number. Returns -1 for mean model.
-        - 'lambda': Box-Cox transformation parameter.
-        - 'mu_left': Mean transformed displacement for the left-peak profile.
-        - 'sigma_left': Standard deviation transformed displacement for the left-peak profile.
-        - 'mu_right': Mean transformed displacement for the right-peak profile.
-        - 'sigma_right': Standard deviation transformed displacement for the right-peak profile.
-        - 'Y_left': Transformed displacement for the left-peak profile.
-        - 'Y_right': Transformed displacement for the right-peak profile.
-        - 'Y_folded': Transformed displacement for the folded (symmetrical) profile.
-        - 'displ_left': Displacement in meters for the left-peak profile.
-        - 'displ_right': Displacement in meters for the right-peak profile.
-        - 'displ_folded': Displacement in meters for the folded (symmetrical) profile.
+        - 'model_name': Profile shape model name [from user input].
+        - 'mu': Natural log transform of mean displacement in cm.
+        - 'sigma': Standard deviation in same units as `mu`.
+        - 'displ': Displacement in meters.
     """
 
     parser = argparse.ArgumentParser(
@@ -169,19 +168,26 @@ def main():
         help="Earthquake moment magnitude. Only one value allowed.",
     )
     parser.add_argument(
-        "-s",
-        "--style",
-        required=True,
-        type=str,
-        choices=("strike-slip", "reverse", "normal"),
-        help="Style of faulting (case-sensitive). Only one value allowed.",
-    )
-    parser.add_argument(
         "-p",
         "--percentile",
         required=True,
         type=float,
         help="Percentile value. Use -1 for mean. Only one value allowed.",
+    )
+    parser.add_argument(
+        "-shape",
+        "--submodel",
+        default="elliptical",
+        type=str,
+        choices=("elliptical", "quadratic", "bilinear"),
+        help="PEA11 shape model name (case-sensitive). Default is 'elliptical'. Only one value allowed.",
+    )
+    parser.add_argument(
+        "-s",
+        "--style",
+        default="strike-slip",
+        type=str,
+        help="Style of faulting. Default is 'strike-slip'; other styles not recommended. Only one value allowed.",
     )
     parser.add_argument(
         "-step",
@@ -194,12 +200,13 @@ def main():
     args = parser.parse_args()
 
     magnitude = args.magnitude
-    style = args.style
     percentile = args.percentile
+    submodel = args.submodel
+    style = args.style
     location_step = args.location_step
 
     try:
-        results = run_profile(magnitude, style, percentile, location_step)
+        results = run_profile(magnitude, percentile, submodel, style, location_step)
         print(results)
 
         # Prompt to save results to CSV

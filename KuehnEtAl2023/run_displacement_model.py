@@ -1,6 +1,6 @@
 """This file runs the KEA23 displacement model for a single scenario.
 - A single scenario is defined as one magnitude, one u_star location, one style, and one percentile.
-- The results are returned in a pandas dataframe.
+- The results are returned in a pandas DataFrame.
 - Results for the location, its complement, and folded location are always returned.
 - The mean model (i.e., mean coefficients) is run by default, but results for all coefficients can be computed.
 - Command-line use is supported; try `python run_displacement_model.py --help`
@@ -22,12 +22,12 @@ from scipy import stats
 
 # Add path for module
 # FIXME: shouldn't need this with a package install (`__init__` should suffice)
-SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.append(str(SCRIPT_DIR))
+MODEL_DIR = Path(__file__).resolve().parents[1]
+sys.path.append(str(MODEL_DIR))
 
 # Module imports
-from data import load_data
-from functions import func_nm, func_rv, func_ss
+from KuehnEtAl2023.data import load_data
+from KuehnEtAl2023.functions import func_nm, func_rv, func_ss
 
 # Adjust display for readability
 pd.set_option("display.max_columns", 50)
@@ -198,9 +198,9 @@ def run_model(magnitude, location, style, percentile, mean_model=True):
         - 'percentile': Percentile value [from user input].
         - 'model_number': Model coefficient row number. Returns -1 for mean model.
         - 'lambda': Box-Cox transformation parameter.
-        - 'mu_site': Median transformed displacement for the location.
+        - 'mu_site': Mean transformed displacement for the location.
         - 'sigma_site': Standard deviation transformed displacement for the location.
-        - 'mu_complement': Median transformed displacement for the complementary location.
+        - 'mu_complement': Mean transformed displacement for the complementary location.
         - 'sigma_complement': Standard deviation transformed displacement for the complementary location.
         - 'Y_site': Transformed displacement for the location.
         - 'Y_complement': Transformed displacement for the complementary location.
@@ -308,7 +308,7 @@ def run_model(magnitude, location, style, percentile, mean_model=True):
     cols_dict = {
         "magnitude": float,
         "location": float,
-        "style": object,
+        "style": str,
         "percentile": float,
         "model_number": int,
         "lambda": float,
@@ -342,9 +342,9 @@ def main():
         - 'percentile': Percentile value [from user input].
         - 'model_number': Model coefficient row number. Returns -1 for mean model.
         - 'lambda': Box-Cox transformation parameter.
-        - 'mu_site': Median transformed displacement for the location.
+        - 'mu_site': Mean transformed displacement for the location.
         - 'sigma_site': Standard deviation transformed displacement for the location.
-        - 'mu_complement': Median transformed displacement for the complementary location.
+        - 'mu_complement': Mean transformed displacement for the complementary location.
         - 'sigma_complement': Standard deviation transformed displacement for the complementary location.
         - 'Y_site': Transformed displacement for the location.
         - 'Y_complement': Transformed displacement for the complementary location.
@@ -376,7 +376,8 @@ def main():
         "--style",
         required=True,
         type=str,
-        help="Style of faulting (case-sensitive). Valid options are 'strike-slip', 'reverse', or 'normal'. Only one value allowed.",
+        choices=("strike-slip", "reverse", "normal"),
+        help="Style of faulting (case-sensitive). Only one value allowed.",
     )
     parser.add_argument(
         "-p",

@@ -1,16 +1,21 @@
-"""This file runs the KEA23 displacement model to calculate the average displacement that is implied by the model prediction for a single scenario.
+"""This file runs the PEA11 principal fault displacement model to calculate the average
+displacement that is implied by the model prediction for a single scenario.
 - A single scenario is defined as one magnitude and one style.
 - The model-implied Average Displacement is calculated as the area under the mean slip profile.
-- The mean model (i.e., mean coefficients) is used.
 - The results are returned in a pandas DataFrame.
+- Only the principal fault displacement models for direct (i.e., not normalized) predictions are
+implemented herein currently.
 - Command-line use is supported; try `python run_average_displacement.py --help`
 - Module use is supported; try `from run_average_displacement import run_ad`
 
 # NOTE: This script just calls `run_displacement_profile.py` which in turn calls `run_displacement_model.py`
 
-Reference: https://doi.org/10.1177/ToBeAssigned
-"""
+Reference: https://doi.org/10.1785/0120100035
 
+# TODO: There is a potential issue with the bilinear model. Because the standard deviation changes
+across l/L', there is a weird step in any profile that is not median. Confirm this is a model
+issue and not misunderstanding in implementation. The issue affects the AD calc for bilinear model.
+"""
 
 # Python imports
 import argparse
@@ -26,26 +31,29 @@ MODEL_DIR = Path(__file__).resolve().parents[1]
 sys.path.append(str(MODEL_DIR))
 
 # Module imports
-from KuehnEtAl2023.run_displacement_profile import run_profile
+from PetersenEtAl2011.run_displacement_profile import run_profile
 
 # Adjust display for readability
 pd.set_option("display.max_columns", 50)
 pd.set_option("display.width", 500)
 
 
-def run_ad(magnitude, style):
+def run_ad(magnitude, submodel="elliptical", style="strike-slip"):
     """
-    Run KEA23 displacement model to calculate the average displacement that is implied by the model
-    prediction for a single scenario. The mean model (i.e., mean coefficients) is used.
+    Run PEA11 principal fault displacement model to calculate the average displacement that is
+    implied by the model prediction for a single scenario.
 
     Parameters
     ----------
     magnitude : float
         Earthquake moment magnitude. Only one value allowed.
 
-    style : str
-        Style of faulting (case-sensitive). Valid options are 'strike-slip', 'reverse', or
-        'normal'. Only one value allowed.
+    submodel : str, optional
+        PEA11 shape model name. Default is 'elliptical'. Valid options are 'elliptical',
+        'quadratic', or 'bilinear'. Only one value allowed.
+
+    style : str, optional
+        Style of faulting (case-sensitive). Default is "strike-slip". Only one value allowed.
 
     Returns
     -------
@@ -53,21 +61,23 @@ def run_ad(magnitude, style):
         A DataFrame with the following columns:
         - 'magnitude': Earthquake moment magnitude [from user input].
         - 'style': Style of faulting [from user input].
-        - 'model_number': Model coefficient row number. Returns -1 for mean model.
+        - 'model_name': Profile shape model name [from user input].
         - 'avg_displ': Averaged displacement in meters.
 
     Raises
     ------
-    ValueError
-        If the provided `style` is not one of the supported styles.
-
     TypeError
-        If more than one value is provided for `magnitude` or `style`.
+        If more than one value is provided for `magnitude`, `submodel`, or `style`.
+
+    Warns
+    -----
+    UserWarning
+        If an unsupported `style` is provided.
 
     Notes
     ------
     Command-line interface usage
-        Run (e.g.) `python run_average_displacement.py --magnitude 7 --style strike-slip`
+        Run (e.g.) `python run_average_displacement.py --magnitude 7 --submodel quadratic`
         Run `python run_average_displacement.py --help`
 
     #TODO
@@ -89,24 +99,32 @@ def run_ad(magnitude, style):
             f"(In other words, only one value is allowed; check you have not entered a list or array.)"
         )
 
+    if not isinstance(submodel, (str)):
+        raise TypeError(
+            f"Expected a string, got '{submodel}', which is a {type(submodel).__name__}."
+            f"(In other words, only one value is allowed; check you have not entered a list or array.)"
+        )
+
     # NOTE: Check for appropriate style is handled upstream
 
     # Calculate mean slip profile
     # NOTE: `percentile=-1` is used for mean
     # NOTE: `location_step=0.01` is used to create well-descritized profile for intergration
-    results = run_profile(magnitude=magnitude, style=style, percentile=-1, location_step=0.01)
+    results = run_profile(
+        magnitude=magnitude, percentile=-1, submodel=submodel, style=style, location_step=0.01
+    )
 
     # Calculate area under the mean slip profile; this is the Average Displacement (AD)
-    x, y = results["location"], results["displ_site"]
+    x, y = results["location"], results["displ"]
     area = np.trapz(y, x)
 
     # Create output dataframe
-    model_id = results["model_number"].iloc[0]
+    model_id = results["model_name"].iloc[0]
     dataframe = pd.concat(
         [
             pd.Series(magnitude, name="magnitude"),
             pd.Series(style, name="style"),
-            pd.Series(model_id, name="model_number"),
+            pd.Series(model_id, name="model_name"),
             pd.Series(area, name="avg_displ"),
         ],
         axis=1,
@@ -116,8 +134,8 @@ def run_ad(magnitude, style):
 
 
 def main():
-    description_text = """Run KEA23 displacement model to calculate the average displacement that is implied by the model
-    prediction for a single scenario. The mean model (i.e., mean coefficients) are used.
+    description_text = """Run PEA11 principal fault displacement model to calculate the average displacement that is
+    implied by the model prediction for a single scenario.
 
     Returns
     -------
@@ -125,7 +143,7 @@ def main():
         A DataFrame with the following columns:
         - 'magnitude': Earthquake moment magnitude [from user input].
         - 'style': Style of faulting [from user input].
-        - 'model_number': Model coefficient row number. Returns -1 for mean model.
+        - 'model_name': Profile shape model name [from user input].
         - 'avg_displ': Averaged displacement in meters.
     """
 
@@ -140,20 +158,29 @@ def main():
         help="Earthquake moment magnitude. Only one value allowed.",
     )
     parser.add_argument(
+        "-shape",
+        "--submodel",
+        default="elliptical",
+        type=str,
+        choices=("elliptical", "quadratic", "bilinear"),
+        help="PEA11 shape model name (case-sensitive). Default is 'elliptical'. Only one value allowed.",
+    )
+    parser.add_argument(
         "-s",
         "--style",
-        required=True,
+        default="strike-slip",
         type=str,
-        choices=("strike-slip", "reverse", "normal"),
-        help="Style of faulting (case-sensitive). Only one value allowed.",
+        help="Style of faulting. Default is 'strike-slip'; other styles not recommended. Only one value allowed.",
     )
 
     args = parser.parse_args()
 
     magnitude = args.magnitude
+    submodel = args.submodel
     style = args.style
+
     try:
-        results = run_ad(magnitude, style)
+        results = run_ad(magnitude, submodel, style)
         print(results)
 
         # Prompt to save results to CSV
