@@ -35,40 +35,113 @@ pd.set_option("display.width", 500)
 
 
 def _calculate_mean_coefficients(coefficients):
-    """ """
+    """
+    Helper function to calculate mean model coefficients.
+
+    Parameters
+    ----------
+    coefficients : pd.DataFrame
+        A pandas DataFrame containing model coefficients.
+
+    Returns
+    -------
+    coeffs : pd.DataFrame
+        A pandas DataFrame containing mean model coefficients.
+    """
+
     coeffs = coefficients.mean(axis=0).to_frame().transpose()
     coeffs.loc[0, "model_number"] = -1  # Define model id as -1 for mean coeffs
     coeffs["model_number"] = coeffs["model_number"].astype(int)
+
     return coeffs
 
 
 def _calculate_distribution_parameters(*, magnitude, location, style, coefficients):
-    """ """
+    """
+    Helper function to calculate predicted mean and standard deviation in transformed units.
+
+    Parameters
+    ----------
+    coefficients : Union[np.recarray, pd.DataFrame]
+        A numpy recarray or a pandas DataFrame containing model coefficients.
+
+    magnitude : float
+        Earthquake moment magnitude.
+
+    location : float
+        Normalized location along rupture length, range [0, 1.0].
+
+    Returns
+    -------
+    Tuple[np.array, np.array]
+        mu : Mean prediction in transformed units.
+        sigma : Total standard deviation in transformed units.
+    """
+
     function_map = {"strike-slip": func_ss, "reverse": func_rv, "normal": func_nm}
 
     # NOTE: Check for appropriate style is handled in `run_model`
     model = function_map[style]
     mu, sigma = model(coefficients, magnitude, location)
+
     return mu, sigma
 
 
 def _calculate_Y(*, mu, sigma, lam, percentile):
-    """ """
+    """
+    Helper function to calculate predicted displacement in transformed units.
+
+    Parameters
+    ----------
+    mu : np.array
+        Mean prediction in transformed units.
+
+    sigma : np.array
+        Total standard deviation in transformed units.
+
+    lam : np.array
+        "Lambda" transformation parameter in Box-Cox transformation.
+
+    percentile : float
+        Percentile value. Use -1 for mean. Only one value allowed.
+
+    Returns
+    -------
+    Y : np.array
+        Predicted displacement in transformed units.
+    """
+
     if percentile == -1:
         # NOTE: Analytical solution from https://robjhyndman.com/hyndsight/backtransforming/
-        D = ((lam * mu + 1) ** (1 / lam)) * (
-            1 + (sigma**2 * (1 - lam)) / (2 * (lam * mu + 1) ** 2)
+        D = (np.power(lam * mu + 1, 1 / lam)) * (
+            1 + (np.power(sigma, 2) * (1 - lam)) / (2 * np.power(lam * mu + 1, 2))
         )
         # NOTE: Analytical soluion is in meters, so convert back to Y transform for consistency
-        Y = (D**lam - 1) / lam
+        Y = (np.power(D, lam) - 1) / lam
     else:
         Y = stats.norm.ppf(percentile, loc=mu, scale=sigma)
     return Y
 
 
 def _calculate_displacement(*, predicted_Y, lam):
-    """ """
-    D = (predicted_Y * lam + 1) ** (1 / lam)
+    """
+    Helper function to calculate predicted displacement in meters.
+
+    Parameters
+    ----------
+    predicted_Y : np.array
+        Predicted displacement in transformed units.
+
+    lam : np.array
+        "Lambda" transformation parameter in Box-Cox transformation.
+
+    Returns
+    -------
+    D : np.array
+        Predicted displacement in meters.
+    """
+
+    D = np.power(predicted_Y * lam + 1, 1 / lam)
 
     # Check for values that are too small to calculate
     D = 0 if np.isnan(D).all() else D

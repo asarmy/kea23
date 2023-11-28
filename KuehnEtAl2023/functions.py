@@ -7,6 +7,22 @@ MAG_BREAK, DELTA = 7.0, 0.1
 
 
 def func_mode(coefficients, magnitude):
+    """
+    Calculate magnitude scaling in transformed units.
+
+    Parameters
+    ----------
+    coefficients : Union[np.recarray, pd.DataFrame]
+        A numpy recarray or a pandas DataFrame containing model coefficients.
+
+    magnitude : float
+        Earthquake moment magnitude.
+
+    Returns
+    -------
+    fm : np.array
+        Mode in transformed units.
+    """
     fm = (
         coefficients["c1"]
         + coefficients["c2"] * (magnitude - MAG_BREAK)
@@ -18,6 +34,26 @@ def func_mode(coefficients, magnitude):
 
 
 def func_mu(coefficients, magnitude, location):
+    """
+    Calculate mean prediction in transformed units.
+
+    Parameters
+    ----------
+    coefficients : Union[np.recarray, pd.DataFrame]
+        A numpy recarray or a pandas DataFrame containing model coefficients.
+
+    magnitude : float
+        Earthquake moment magnitude.
+
+    location : np.array
+        Normalized location along rupture length, range [0, 1.0].
+
+    Returns
+    -------
+    mu : float
+        Mean prediction in transformed units.
+    """
+
     fm = func_mode(coefficients, magnitude=magnitude)
 
     alpha = coefficients["alpha"]
@@ -28,12 +64,32 @@ def func_mu(coefficients, magnitude, location):
         beta / (alpha + beta), beta
     )
 
-    mu = a + gamma * (location**alpha) * ((1 - location) ** beta)
-    return mu
+    mu = a + gamma * np.power(location, alpha) * np.power(1 - location, beta)
+    return np.asarray(mu)
 
 
 def func_sd_mode_bilinear(coefficients, magnitude):
-    # Used only for strike-slip
+    """
+    Calculate standard deviation of the mode in transformed units.
+
+    Parameters
+    ----------
+    coefficients : Union[np.recarray, pd.DataFrame]
+        A numpy recarray or a pandas DataFrame containing model coefficients.
+
+    magnitude : float
+        Earthquake moment magnitude.
+
+    Returns
+    -------
+    sd: np.array
+        Standard deviation of the mode in transformed units.
+
+    Notes
+    ------
+    Bilinear standard deviation model is only used for strike-slip faulting.
+    """
+
     sd = (
         coefficients["s_m,s1"]
         + coefficients["s_m,s2"] * (magnitude - coefficients["s_m,s3"])
@@ -41,19 +97,59 @@ def func_sd_mode_bilinear(coefficients, magnitude):
         * DELTA
         * np.log(1 + np.exp((magnitude - coefficients["s_m,s3"]) / DELTA))
     )
-    return sd
+    return np.asarray(sd)
 
 
 def func_sd_mode_sigmoid(coefficients, magnitude):
-    # Used only for normal
+    """
+    Calculate standard deviation of the mode in transformed units.
+
+    Parameters
+    ----------
+    coefficients : Union[np.recarray, pd.DataFrame]
+        A numpy recarray or a pandas DataFrame containing model coefficients.
+
+    magnitude : float
+        Earthquake moment magnitude.
+
+    Returns
+    -------
+    sd: np.array
+        Standard deviation of the mode in transformed units.
+
+    Notes
+    ------
+    Sigmoidal standard deviation model is only used for normal faulting.
+    """
+
     sd = coefficients["s_m,n1"] - coefficients["s_m,n2"] / (
         1 + np.exp(-1 * coefficients["s_m,n3"] * (magnitude - MAG_BREAK))
     )
-    return sd
+    return np.asarray(sd)
 
 
 def func_sd_u(coefficients, location):
-    # Used only for strike-slip and reverse
+    """
+    Calculate standard deviation of the location in transformed units.
+
+    Parameters
+    ----------
+    coefficients : Union[np.recarray, pd.DataFrame]
+        A numpy recarray or a pandas DataFrame containing model coefficients.
+
+    location : float
+        Normalized location along rupture length, range [0, 1.0].
+
+    Returns
+    -------
+    sd : np.array
+        Standard deviation of the location in transformed units.
+
+    Notes
+    ------
+    Used only for strike-slip and reverse faulting.
+    """
+
     # Column name2 for stdv coefficients "s_" varies for style of faulting, fix that here
     if isinstance(coefficients, pd.DataFrame):
         s_1 = coefficients["s_s1"] if "s_s1" in coefficients.columns else coefficients["s_r1"]
@@ -63,47 +159,113 @@ def func_sd_u(coefficients, location):
         s_2 = coefficients["s_s2"] if "s_s2" in coefficients.dtype.names else coefficients["s_r2"]
     else:
         raise TypeError(
-            "Function arguement for model coefficients must be Pandas DataFrame or NumPy RecArray."
+            "Function argument for model coefficients must be pandas DataFrame or numpy recarray."
         )
 
     alpha = coefficients["alpha"]
     beta = coefficients["beta"]
 
-    sd = s_1 + s_2 * (location - alpha / (alpha + beta)) ** 2
-    return sd
+    sd = s_1 + s_2 * np.power(location - alpha / (alpha + beta), 2)
+    return np.asarray(sd)
 
 
 def func_ss(coefficients, magnitude, location):
-    # Calculate median prediction
-    med = func_mu(coefficients, magnitude, location)
+    """
+    Calculate mean prediction and standard deviations (both in transformed units) for strike-slip
+    faulting.
+
+    Parameters
+    ----------
+    coefficients : Union[np.recarray, pd.DataFrame]
+        A numpy recarray or a pandas DataFrame containing model coefficients.
+
+    magnitude : float
+        Earthquake moment magnitude.
+
+    location : float
+        Normalized location along rupture length, range [0, 1.0].
+
+    Returns
+    -------
+    Tuple[np.array, np.array]
+        mu : Mean prediction in transformed units.
+        sd_total : Total standard deviation in transformed units.
+    """
+
+    # Calculate mean prediction
+    mu = func_mu(coefficients, magnitude, location)
 
     # Calculate standard deviations
     sd_mode = func_sd_mode_bilinear(coefficients, magnitude)
     sd_u = func_sd_u(coefficients, location)
-    sd_total = np.sqrt(sd_mode**2 + sd_u**2)
+    sd_total = np.sqrt(np.power(sd_mode, 2) + np.power(sd_u, 2))
 
-    return med, sd_total
+    return mu, sd_total
 
 
 def func_nm(coefficients, magnitude, location):
-    # Calculate median prediction
-    med = func_mu(coefficients, magnitude, location)
+    """
+    Calculate mean prediction and standard deviations (both in transformed units) for normal
+    faulting.
+
+    Parameters
+    ----------
+    coefficients : Union[np.recarray, pd.DataFrame]
+        A numpy recarray or a pandas DataFrame containing model coefficients.
+
+    magnitude : float
+        Earthquake moment magnitude.
+
+    location : float
+        Normalized location along rupture length, range [0, 1.0].
+
+    Returns
+    -------
+    Tuple[np.array, np.array]
+        mu : Mean prediction in transformed units.
+        sd_total : Total standard deviation in transformed units.
+    """
+
+    # Calculate mean prediction
+    mu = func_mu(coefficients, magnitude, location)
 
     # Calculate standard deviations
     sd_mode = func_sd_mode_sigmoid(coefficients, magnitude)
-    sd_u = coefficients["sigma"]
-    sd_total = np.sqrt(sd_mode**2 + sd_u**2)
+    sd_u = np.asarray(coefficients["sigma"])
+    sd_total = np.sqrt(np.power(sd_mode, 2) + np.power(sd_u, 2))
 
-    return med, sd_total
+    return mu, sd_total
 
 
 def func_rv(coefficients, magnitude, location):
-    # Calculate median prediction
-    med = func_mu(coefficients, magnitude, location)
+    """
+    Calculate mean prediction and standard deviations (both in transformed units) for reverse
+    faulting.
+
+    Parameters
+    ----------
+    coefficients : Union[np.recarray, pd.DataFrame]
+        A numpy recarray or a pandas DataFrame containing model coefficients.
+
+    magnitude : float
+        Earthquake moment magnitude.
+
+    location : float
+        Normalized location along rupture length, range [0, 1.0].
+
+    Returns
+    -------
+    Tuple[np.array, np.array]
+        mu : Mean prediction in transformed units.
+        sd_total : Total standard deviation in transformed units.
+    """
+
+    # Calculate mean prediction
+    mu = func_mu(coefficients, magnitude, location)
 
     # Calculate standard deviations
-    sd_mode = coefficients["s_m,r"]
+    sd_mode = np.asarray(coefficients["s_m,r"])
     sd_u = func_sd_u(coefficients, location)
-    sd_total = np.sqrt(sd_mode**2 + sd_u**2)
+    sd_total = np.sqrt(np.power(sd_mode, 2) + np.power(sd_u, 2))
 
-    return med, sd_total
+    return mu, sd_total

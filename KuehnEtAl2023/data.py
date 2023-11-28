@@ -1,3 +1,14 @@
+"""This script is called to load the model coefficients for the KEA23 displacement model.
+- The coefficient files vary based on style of faulting.
+- The coefficients are returned in a pandas dataframe.
+- Command-line use is supported; try `python data.py --help`
+- Module use is supported; try `from data import load_data`
+
+# NOTE: This script is called in the main function is `run_model()`.
+
+Reference: https://doi.org/10.1177/ToBeAssigned
+"""
+
 # Python imports
 import argparse
 from pathlib import Path
