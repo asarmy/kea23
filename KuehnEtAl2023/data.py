@@ -4,7 +4,7 @@
 - Command-line use is supported; try `python data.py --help`
 - Module use is supported; try `from data import load_data`
 
-# NOTE: This script is called in the main function is `run_model()`.
+# NOTE: This script is called in the main function in `run_model()`.
 
 Reference: https://doi.org/10.1177/ToBeAssigned
 """
