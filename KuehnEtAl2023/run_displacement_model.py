@@ -14,6 +14,7 @@ Reference: https://doi.org/10.1177/ToBeAssigned
 # Python imports
 import argparse
 import sys
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -112,6 +113,10 @@ def _calculate_Y(*, mu, sigma, lam, percentile):
     """
 
     if percentile == -1:
+        # FIXME: Some base-exponent combinations create a tiny number; can't seem to get a
+        # try/except to work, so use this very bad practice solution of warning suppression
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+
         # NOTE: Analytical solution from https://robjhyndman.com/hyndsight/backtransforming/
         D = (np.power(lam * mu + 1, 1 / lam)) * (
             1 + (np.power(sigma, 2) * (1 - lam)) / (2 * np.power(lam * mu + 1, 2))
