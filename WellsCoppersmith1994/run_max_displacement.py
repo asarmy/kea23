@@ -65,7 +65,7 @@ def run_md(magnitude, percentile=0.5, style="all"):
         If the provided `style` is not one of the supported styles.
 
     TypeError
-        If more than one value is provided for `magnitude` or `style`.
+        If more than one value is provided for `magnitude`, `percentile`, or `style`.
 
     Warns
     -----
@@ -95,11 +95,12 @@ def run_md(magnitude, percentile=0.5, style="all"):
         warnings.warn(msg)
 
     # Check for only one scenario
-    if not isinstance(magnitude, (float, int, np.int32)):
-        raise TypeError(
-            f"Expected a float or int, got '{magnitude}', which is a {type(magnitude).__name__}."
-            f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-        )
+    for variable in [magnitude, percentile]:
+        if not isinstance(variable, (float, int, np.int32)):
+            raise TypeError(
+                f"Expected a float or int, got '{variable}', which is a {type(variable).__name__}."
+                f"(In other words, only one value is allowed; check you have not entered a list or array.)"
+            )
 
     if not isinstance(style, (str)):
         raise TypeError(

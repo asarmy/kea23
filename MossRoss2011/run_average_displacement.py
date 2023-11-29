@@ -1,4 +1,4 @@
-"""This file runs the WC94 model to calculate the average displacement as a function of magnitude
+"""This file runs the MR11 model to calculate the average displacement as a function of magnitude
 for a single scenario.
 - A single scenario is defined as one magnitude and one style.
 - The results are returned in a pandas DataFrame.
@@ -24,16 +24,16 @@ MODEL_DIR = Path(__file__).resolve().parents[1]
 sys.path.append(str(MODEL_DIR))
 
 # Module imports
-from WellsCoppersmith1994.functions import _calc_distrib_params_mag_ad
+from MossRoss2011.functions import _calc_distrib_params_mag_ad
 
 # Adjust display for readability
 pd.set_option("display.max_columns", 50)
 pd.set_option("display.width", 500)
 
 
-def run_ad(magnitude, percentile=0.5, style="all"):
+def run_ad(magnitude, percentile=0.5, style="reverse"):
     """
-    Run WC94 model to calculate the average displacement as a function of magnitude for a single
+    Run MR11 model to calculate the average displacement as a function of magnitude for a single
     scenario.
 
     Parameters
@@ -45,8 +45,7 @@ def run_ad(magnitude, percentile=0.5, style="all"):
         Percentile value. Default is 0.5. Use -1 for mean. Only one value allowed.
 
     style : str, optional
-        Style of faulting (case-insensitive). Default is 'all'. Valid options are 'strike-slip',
-        'reverse', 'normal', or 'all'. Only one value allowed.
+        Style of faulting (case-insensitive). Default is 'reverse'. Only one value allowed.
 
     Returns
     -------
@@ -61,21 +60,18 @@ def run_ad(magnitude, percentile=0.5, style="all"):
 
     Raises
     ------
-    ValueError
-        If the provided `style` is not one of the supported styles.
-
     TypeError
         If more than one value is provided for `magnitude`, `percentile`, or `style`.
 
     Warns
     -----
     UserWarning
-        If reverse `style` is provided.
+        If an unsupported `style` is provided.
 
     Notes
     ------
     Command-line interface usage
-        Run (e.g.) `python run_average_displacement.py --magnitude 7 --style strike-slip`
+        Run (e.g.) `python run_average_displacement.py --magnitude 7`
         Run `python run_average_displacement.py --help`
 
     #TODO
@@ -84,15 +80,11 @@ def run_ad(magnitude, percentile=0.5, style="all"):
     """
 
     # Check style
-    if style.lower() not in ["strike-slip", "reverse", "normal", "all"]:
-        raise ValueError(
-            f"Unsupported style '{style}'. Supported styles are 'strike-slip', 'reverse', 'normal', and 'all' (case-insensitive)."
+    if style not in ("reverse", "Reverse"):
+        warnings.warn(
+            f"This model is only recommended for reverse faulting, but '{style}' was entered.",
+            category=UserWarning,
         )
-
-    # Warn if reverse; relations not recommended
-    if style in ["reverse", "Reverse"]:
-        msg = "Regressions for reverse-slip relationships are not significant at 95% probability level (per WC94). Use with caution."
-        warnings.warn(msg)
 
     # Check for only one scenario
     for variable in [magnitude, percentile]:
@@ -109,7 +101,7 @@ def run_ad(magnitude, percentile=0.5, style="all"):
         )
 
     # Calculate distribution parameters
-    mu, sigma = _calc_distrib_params_mag_ad(magnitude=magnitude, style=style)
+    mu, sigma = _calc_distrib_params_mag_ad(magnitude=magnitude)
 
     # Calculate log of displacement
     if percentile == -1:
@@ -137,7 +129,7 @@ def run_ad(magnitude, percentile=0.5, style="all"):
 
 
 def main():
-    description_text = """Run WC94 model to calculate the average displacement as a function of
+    description_text = """Run MR11 model to calculate the average displacement as a function of
     magnitude for a single scenario.
 
     Returns
@@ -172,10 +164,9 @@ def main():
     parser.add_argument(
         "-s",
         "--style",
-        default="all",
+        default="reverse",
         type=str,
-        choices=("strike-slip", "reverse", "normal", "all"),
-        help="Style of faulting (case-insensitive). Default is 'all'. Only one value allowed.",
+        help="Style of faulting. Default is 'reverse'; other styles not recommended. Only one value allowed.",
     )
 
     args = parser.parse_args()
