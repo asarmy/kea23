@@ -49,15 +49,15 @@ def run_ad(
         - 'magnitude': Earthquake moment magnitude [from user input].
         - 'style': Style of faulting [from user input].
         - 'model_number': Model coefficient row number. Returns -1 for mean model.
-        - 'avg_displ': Averaged displacement in meters.
+        - 'avg_displ': Average displacement in meters.
 
-    Raises
+    Raises (inherited from `run_displacement_model.py`)
     ------
     ValueError
         If the provided `style` is not one of the supported styles.
 
     TypeError
-        If more than one value is provided for `magnitude` or `style`.
+        If more than one value is provided for `style`.
 
     Notes
     ------
@@ -81,7 +81,7 @@ def run_ad(
     grouped = results.groupby("magnitude")
 
     # Calculate area under the mean slip profile; this is the Average Displacement (AD)
-    # NOTE: use dictionary comprehension, it is probably slightly faster than apply
+    # NOTE: use dictionary comprehension, it is probably slightly faster than apply lambda
     areas = {name: np.trapz(group["displ_site"], group["location"]) for name, group in grouped}
 
     # Create output dataframe
@@ -117,7 +117,7 @@ def main():
         - 'magnitude': Earthquake moment magnitude [from user input].
         - 'style': Style of faulting [from user input].
         - 'model_number': Model coefficient row number. Returns -1 for mean model.
-        - 'avg_displ': Averaged displacement in meters.
+        - 'avg_displ': Average displacement in meters.
     """
 
     parser = argparse.ArgumentParser(

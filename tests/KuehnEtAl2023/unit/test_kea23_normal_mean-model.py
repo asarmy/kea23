@@ -6,13 +6,13 @@ import numpy as np
 import pytest
 
 # Add path for module
-# FIXME: shouldn't need this with a package install (`__init__` should suffice?!)
-MODEL_DIR = Path(__file__).resolve().parents[3] / "KuehnEtAl2023"
-sys.path.append(str(MODEL_DIR))
+# FIXME: shouldn't need this with a package install (`__init__` should suffice)
+PROJ_DIR = Path(__file__).resolve().parents[3]
+sys.path.append(str(PROJ_DIR))
 
 # Module imports
-from data import POSTERIOR_MEAN
-from functions import (
+from KuehnEtAl2023.data import POSTERIOR_MEAN
+from KuehnEtAl2023.functions import (
     func_mu,
     func_mode,
     func_sd_mode_sigmoid,

@@ -77,7 +77,7 @@ def _calculate_Y(*, mu, sigma, lam, percentile):
         "Lambda" transformation parameter in Box-Cox transformation.
 
     percentile : np.array
-        Aleatory quantile value. Use -1 for mean. Only one value allowed.
+        Aleatory quantile value. Use -1 for mean.
 
     Returns
     -------
@@ -191,7 +191,8 @@ def run_model(
         If the provided `style` is not one of the supported styles.
 
     TypeError
-        If more than one value is provided for `magnitude`, `location`, `style`, or `percentile` when `mean_model=False`.
+        If more than one value is provided for `style`.
+        If more than one value is provided for `magnitude`, `location`, or `percentile` when `mean_model=False`.
 
     Notes
     ------
