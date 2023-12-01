@@ -1,5 +1,4 @@
-"""This file runs the KEA23 displacement model to calculate the average displacement that is implied by the model prediction for a single scenario.
-- A single scenario is defined as one magnitude and one style.
+"""This file runs the KEA23 displacement model to calculate the average displacement that is implied by the model prediction.
 - The model-implied Average Displacement is calculated as the area under the mean slip profile.
 - The mean model (i.e., mean coefficients) is used.
 - The results are returned in a pandas DataFrame.
@@ -14,37 +13,33 @@ Reference: https://doi.org/10.1177/ToBeAssigned
 
 # Python imports
 import argparse
-import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
-# Add path for module
-# FIXME: shouldn't need this with a package install (`__init__` should suffice)
-MODEL_DIR = Path(__file__).resolve().parents[1]
-sys.path.append(str(MODEL_DIR))
+from typing import Union, List
 
 # Module imports
+import model_config  # noqa: F401
 from KuehnEtAl2023.run_displacement_profile import run_profile
 
-# Adjust display for readability
-pd.set_option("display.max_columns", 50)
-pd.set_option("display.width", 500)
 
-
-def run_ad(magnitude, style):
+def run_ad(
+    *, magnitude: Union[float, int, List[Union[float, int]], np.ndarray], style: str
+) -> pd.DataFrame:
     """
     Run KEA23 displacement model to calculate the average displacement that is implied by the model
-    prediction for a single scenario. The mean model (i.e., mean coefficients) is used.
+    prediction. All parameters must be passed as keyword arguments. The mean model (i.e., mean
+    coefficients) is used. Only one style of faulting is allowed, but multiple magnitudes are
+    allowed.
 
     Parameters
     ----------
-    magnitude : float
-        Earthquake moment magnitude. Only one value allowed.
+    magnitude : Union[float, list, numpy.ndarray]
+        Earthquake moment magnitude.
 
     style : str
-        Style of faulting (case-sensitive). Valid options are 'strike-slip', 'reverse', or
+        Style of faulting (case-insensitive). Valid options are 'strike-slip', 'reverse', or
         'normal'. Only one value allowed.
 
     Returns
@@ -67,27 +62,13 @@ def run_ad(magnitude, style):
     Notes
     ------
     Command-line interface usage
-        Run (e.g.) `python run_average_displacement.py --magnitude 7 --style strike-slip`
+        Run (e.g.) `python run_average_displacement.py --magnitude 5 6 7 --style reverse`
         Run `python run_average_displacement.py --help`
 
     #TODO
     ------
     Raise a UserWarning for magntiudes outside recommended ranges.
-    This runs very slowly when you loop through magnitudes (e.g., creating an M-AD plot). Vectorize somehow (move to numpy? cython?)
     """
-
-    # Check for only one scenario
-    if not isinstance(magnitude, (float, int, np.int32)):
-        raise TypeError(
-            f"Expected a float or int, got '{magnitude}', which is a {type(magnitude).__name__}."
-            f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-        )
-
-    if not isinstance(style, (str)):
-        raise TypeError(
-            f"Expected a string, got '{style}', which is a {type(style).__name__}."
-            f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-        )
 
     # NOTE: Check for appropriate style is handled upstream
 
@@ -96,28 +77,38 @@ def run_ad(magnitude, style):
     # NOTE: `location_step=0.01` is used to create well-descritized profile for intergration
     results = run_profile(magnitude=magnitude, style=style, percentile=-1, location_step=0.01)
 
+    # Group by magnitude
+    grouped = results.groupby("magnitude")
+
     # Calculate area under the mean slip profile; this is the Average Displacement (AD)
-    x, y = results["location"], results["displ_site"]
-    area = np.trapz(y, x)
+    # NOTE: use dictionary comprehension, it is probably slightly faster than apply
+    areas = {name: np.trapz(group["displ_site"], group["location"]) for name, group in grouped}
 
     # Create output dataframe
-    model_id = results["model_number"].iloc[0]
-    dataframe = pd.concat(
-        [
-            pd.Series(magnitude, name="magnitude"),
-            pd.Series(style, name="style"),
-            pd.Series(model_id, name="model_number"),
-            pd.Series(area, name="avg_displ"),
-        ],
-        axis=1,
+    n = len(areas)
+
+    values = (
+        list(areas.keys()),
+        np.full(n, style),
+        np.full(n, results["model_number"].iloc[0]),
+        list(areas.values()),
     )
+
+    type_dict = {
+        "magnitude": float,
+        "style": str,
+        "model_number": int,
+        "avg_displ": float,
+    }
+    dataframe = pd.DataFrame(np.column_stack(values), columns=type_dict.keys())
+    dataframe = dataframe.astype(type_dict)
 
     return dataframe
 
 
 def main():
     description_text = """Run KEA23 displacement model to calculate the average displacement that is implied by the model
-    prediction for a single scenario. The mean model (i.e., mean coefficients) are used.
+    prediction. The mean model (i.e., mean coefficients) is used. Only one style of faulting is allowed, but multiple magnitudes and are allowed.
 
     Returns
     -------
@@ -136,14 +127,15 @@ def main():
         "-m",
         "--magnitude",
         required=True,
+        nargs="+",
         type=float,
-        help="Earthquake moment magnitude. Only one value allowed.",
+        help="Earthquake moment magnitude.",
     )
     parser.add_argument(
         "-s",
         "--style",
         required=True,
-        type=str,
+        type=str.lower,
         choices=("strike-slip", "reverse", "normal"),
         help="Style of faulting (case-sensitive). Only one value allowed.",
     )
@@ -153,7 +145,7 @@ def main():
     magnitude = args.magnitude
     style = args.style
     try:
-        results = run_ad(magnitude, style)
+        results = run_ad(magnitude=magnitude, style=style)
         print(results)
 
         # Prompt to save results to CSV

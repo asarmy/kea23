@@ -1,12 +1,11 @@
-"""This file runs the KEA23 displacement model to create a slip profile for a single scenario.
-- A single scenario is defined as one magnitude, one style, and one percentile.
+"""This file runs the KEA23 displacement model to create a slip profile.
 - The mean model (i.e., mean coefficients) is used.
 - The results are returned in a pandas DataFrame.
 - Results for left-peak, right-peak, and folded (symmetrical) profiles are always returned.
 - Command-line use is supported; try `python run_displacement_profile.py --help`
 - Module use is supported; try `from run_displacement_profile import run_profile`
 
-# NOTE: This script just loops over locations in `run_displacement_model.py`
+# NOTE: This script just calls `run_displacement_model.py`
 
 Reference: https://doi.org/10.1177/ToBeAssigned
 """
@@ -14,41 +13,40 @@ Reference: https://doi.org/10.1177/ToBeAssigned
 
 # Python imports
 import argparse
-import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
-# Add path for module
-# FIXME: shouldn't need this with a package install (`__init__` should suffice)
-MODEL_DIR = Path(__file__).resolve().parents[1]
-sys.path.append(str(MODEL_DIR))
+from typing import Union, List
 
 # Module imports
+import model_config  # noqa: F401
 from KuehnEtAl2023.run_displacement_model import run_model
 
-# Adjust display for readability
-pd.set_option("display.max_columns", 50)
-pd.set_option("display.width", 500)
 
-
-def run_profile(magnitude, style, percentile, location_step=0.05):
+def run_profile(
+    *,
+    magnitude: Union[float, int, List[Union[float, int]], np.ndarray],
+    style: str,
+    percentile: Union[float, int, List[Union[float, int]], np.ndarray],
+    location_step: float = 0.05,
+) -> pd.DataFrame:
     """
-    Run KEA23 displacement model to create slip profile for a single scenario. The mean model
-    (i.e., mean coefficients) is used.
+    Run KEA23 displacement model to create slip profile. All parameters must be passed as keyword
+    arguments. The mean model (i.e., mean coefficients) is used. Only one style of faulting is
+    allowed, but multiple magnitudes and percentiles are allowed.
 
     Parameters
     ----------
-    magnitude : float
-        Earthquake moment magnitude. Only one value allowed.
+    magnitude : Union[float, list, numpy.ndarray]
+        Earthquake moment magnitude.
 
     style : str
-        Style of faulting (case-sensitive). Valid options are 'strike-slip', 'reverse', or
-        'normal'. Only one value allowed.
+        Style of faulting (case-insensitive). Valid options are 'strike-slip', 'reverse', or
+        'normal'.
 
-    percentile : float
-        Percentile value. Use -1 for mean. Only one value allowed.
+    percentile : Union[float, list, numpy.ndarray]
+        Aleatory quantile value. Use -1 for mean.
 
     location_step : float, optional
         Profile step interval in percentage. Default 0.05.
@@ -74,18 +72,18 @@ def run_profile(magnitude, style, percentile, location_step=0.05):
         - 'displ_right': Displacement in meters for the right-peak profile.
         - 'displ_folded': Displacement in meters for the folded (symmetrical) profile.
 
-    Raises
+    Raises (inherited from `run_displacement_model.py`)
     ------
     ValueError
         If the provided `style` is not one of the supported styles.
 
     TypeError
-        If more than one value is provided for `magnitude`, `style`, or `percentile`.
+        If more than one value is provided for `style`.
 
     Notes
     ------
     Command-line interface usage
-        Run (e.g.) `python run_displacement_profile.py --magnitude 7 --style strike-slip --percentile 0.5 -step 0.01`
+        Run (e.g.) `python run_displacement_profile.py --magnitude 6 7 --style strike-slip --percentile 0.5 -step 0.01`
         Run `python run_displacement_profile.py --help`
 
     #TODO
@@ -95,45 +93,24 @@ def run_profile(magnitude, style, percentile, location_step=0.05):
     Raise a UserWarning for magntiudes outside recommended ranges.
     """
 
-    # Check for only one scenario
-    for variable in [magnitude, percentile]:
-        if not isinstance(variable, (float, int, np.int32)):
-            raise TypeError(
-                f"Expected a float or int, got '{variable}', which is a {type(variable).__name__}."
-                f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-            )
-
-    if not isinstance(style, (str)):
-        raise TypeError(
-            f"Expected a string, got '{style}', which is a {type(style).__name__}."
-            f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-        )
-
     # NOTE: Check for appropriate style is handled in `run_model`
 
     # Create profile location array
-    locations = np.arange(0, 1 + location_step, location_step).tolist()
+    locations = np.arange(0, 1 + location_step, location_step)
 
-    # Calculations
-    run_results = []
-    for location in locations:
-        results = run_model(
-            magnitude=magnitude,
-            location=location,
-            style=style,
-            percentile=percentile,
-            mean_model=True,
-        )
-        run_results.append(results)
+    dataframe = run_model(
+        magnitude=magnitude,
+        location=locations,
+        style=style,
+        percentile=percentile,
+        mean_model=True,
+    )
 
-    dataframe = pd.concat(run_results, ignore_index=True)
-
-    return dataframe
+    return dataframe.sort_values(by=["magnitude", "percentile", "location"])
 
 
 def main():
-    description_text = """Run KEA23 displacement model to create slip profile for a single scenario.
-    The mean model (i.e., mean coefficients) are used.
+    description_text = """Run KEA23 displacement model to create slip profile. The mean model (i.e., mean coefficients) is used. Only one style of faulting is allowed, but multiple magnitudes and percentiles are allowed.
 
     Returns
     -------
@@ -143,7 +120,7 @@ def main():
         - 'magnitude': Earthquake moment magnitude [from user input].
         - 'location':  Normalized location along rupture length [generated from location_step].
         - 'style': Style of faulting [from user input].
-        - 'percentile': Percentile value [from user input].
+        - 'percentile': Aleatory quantile value [from user input].
         - 'model_number': Model coefficient row number. Returns -1 for mean model.
         - 'lambda': Box-Cox transformation parameter.
         - 'mu_left': Mean transformed displacement for the left-peak profile.
@@ -165,14 +142,15 @@ def main():
         "-m",
         "--magnitude",
         required=True,
+        nargs="+",
         type=float,
-        help="Earthquake moment magnitude. Only one value allowed.",
+        help="Earthquake moment magnitude.",
     )
     parser.add_argument(
         "-s",
         "--style",
         required=True,
-        type=str,
+        type=str.lower,
         choices=("strike-slip", "reverse", "normal"),
         help="Style of faulting (case-sensitive). Only one value allowed.",
     )
@@ -180,8 +158,9 @@ def main():
         "-p",
         "--percentile",
         required=True,
+        nargs="+",
         type=float,
-        help="Percentile value. Use -1 for mean. Only one value allowed.",
+        help="Aleatory quantile value. Use -1 for mean.",
     )
     parser.add_argument(
         "-step",
@@ -199,7 +178,12 @@ def main():
     location_step = args.location_step
 
     try:
-        results = run_profile(magnitude, style, percentile, location_step)
+        results = run_profile(
+            magnitude=magnitude,
+            style=style,
+            percentile=percentile,
+            location_step=location_step,
+        )
         print(results)
 
         # Prompt to save results to CSV

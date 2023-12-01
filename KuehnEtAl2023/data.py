@@ -1,8 +1,6 @@
-"""This script is called to load the model coefficients for the KEA23 displacement model.
+"""This script loads the model coefficients for the KEA23 displacement model.
 - The coefficient files vary based on style of faulting.
 - The coefficients are returned in a pandas dataframe.
-- Command-line use is supported; try `python data.py --help`
-- Module use is supported; try `from data import load_data`
 
 # NOTE: This script is called in the main function in `run_model()`.
 
@@ -10,8 +8,8 @@ Reference: https://doi.org/10.1177/ToBeAssigned
 """
 
 # Python imports
-import argparse
 from pathlib import Path
+from typing import Union
 
 import pandas as pd
 
@@ -25,76 +23,74 @@ FILENAMES = {
     "normal": "coefficients_posterior_NM_powtr.csv",
 }
 
-# Constant error message for unsupported style
-MSG = "Unsupported style '{style}'. Supported styles are 'strike-slip', 'reverse', and 'normal' (case-sensitive)."
 
-
-def load_data(style):
+def _load_data(filepath: Union[str, Path]) -> pd.DataFrame:
     """
-    Load model coefficients based on style of faulting.
+    Load model coefficients.
 
     Parameters
     ----------
-    style : str
-        Style of faulting (case-sensitive).
-        Valid options are 'strike-slip', 'reverse', or 'normal'.
+    filepath : Union[str, pathlib.Path]
+        The path to the CSV file containting the model coefficients.
 
     Returns
     -------
-    DataFrame
-        A pandas DataFrame containing the loaded data.
+    pandas.DataFrame
+        A DataFrame containing the model coefficients.
 
-    Raises
-    ------
-    ValueError
-        If the provided `style` is not one of the supported styles.
-
-    Notes
-    ------
-    Command-line interface usage
-        Run (e.g.) `python data.py --style normal`
-        Run `python data.py --help`
-        #NOTE: CLI is not useful for this application (loading coeffs) but included for completeness.
     """
 
-    if style in FILENAMES:
-        filename = FILENAMES[style]
-        filepath = DIR_DATA / filename
-        df = pd.read_csv(filepath)
-        df = df.rename(columns={"Unnamed: 0": "model_number"})
-        # print(f"Model coefficients successfully loaded for {style} faulting.")
-        return df
-    else:
-        raise ValueError(MSG.format(style=style))
+    if not isinstance(filepath, Path):
+        filepath = Path(filepath)
+
+    # FIXME: Various issues with recarray, use pandas for now
+    # data = np.genfromtxt(filepath, delimiter=",", names=True, encoding="UTF-8-sig")
+    # return data.view(np.recarray)
+    return pd.read_csv(filepath).rename(columns={"Unnamed: 0": "model_number"})
 
 
-def main():
-    # Command-line argument parser
-    parser = argparse.ArgumentParser(
-        description="Load model coefficients based on style of faulting."
-    )
-    parser.add_argument(
-        "-s",
-        "--style",
-        required=True,
-        type=str,
-        help="Style of faulting (case-sensitive). Valid options are 'strike-slip', 'reverse', or 'normal'.",
-    )
-    args = parser.parse_args()
+def _calculate_mean_coefficients(coefficients: pd.DataFrame) -> pd.DataFrame:
+    """
+    Helper function to calculate mean model coefficients.
 
-    style = args.style
+    Parameters
+    ----------
+    coefficients : pd.DataFrame
+        A pandas DataFrame containing model coefficients.
 
-    # Check if the style is valid before calling load_data
-    if style not in FILENAMES:
-        print(MSG.format(style=style))
-        return
+    Returns
+    -------
+    coeffs : pd.DataFrame
+        A pandas DataFrame containing mean model coefficients.
+    """
 
-    try:
-        data = load_data(style)
-        print(data)
-    except ValueError as e:
-        print(e)
+    coeffs = coefficients.mean(axis=0).to_frame().transpose()
+    coeffs.loc[0, "model_number"] = -1  # Define model id as -1 for mean coeffs
+    coeffs["model_number"] = coeffs["model_number"].astype(int)
+
+    return coeffs
 
 
-if __name__ == "__main__":
-    main()
+# Import model coefficients
+POSTERIOR_SS = _load_data(DIR_DATA / FILENAMES["strike-slip"])
+POSTERIOR_RV = _load_data(DIR_DATA / FILENAMES["reverse"])
+POSTERIOR_NM = _load_data(DIR_DATA / FILENAMES["normal"])
+
+# Create style-data dictionary
+POSTERIOR = {
+    "strike-slip": POSTERIOR_SS,
+    "reverse": POSTERIOR_RV,
+    "normal": POSTERIOR_NM,
+}
+
+# Calculate mean model coefficients
+POSTERIOR_SS_MEAN = _calculate_mean_coefficients(POSTERIOR_SS)
+POSTERIOR_RV_MEAN = _calculate_mean_coefficients(POSTERIOR_RV)
+POSTERIOR_NM_MEAN = _calculate_mean_coefficients(POSTERIOR_NM)
+
+# Create style-data dictionary
+POSTERIOR_MEAN = {
+    "strike-slip": POSTERIOR_SS_MEAN,
+    "reverse": POSTERIOR_RV_MEAN,
+    "normal": POSTERIOR_NM_MEAN,
+}

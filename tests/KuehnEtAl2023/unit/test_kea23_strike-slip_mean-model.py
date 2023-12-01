@@ -6,13 +6,13 @@ import numpy as np
 import pytest
 
 # Add path for module
-# FIXME: shouldn't need this with a package install (`__init__` should suffice)
-PROJ_DIR = Path(__file__).resolve().parents[3]
-sys.path.append(str(PROJ_DIR))
+# FIXME: shouldn't need this with a package install (`__init__` should suffice?!)
+MODEL_DIR = Path(__file__).resolve().parents[3] / "KuehnEtAl2023"
+sys.path.append(str(MODEL_DIR))
 
 # Module imports
-from KuehnEtAl2023.data import load_data
-from KuehnEtAl2023.functions import (
+from data import POSTERIOR_MEAN
+from functions import (
     func_mu,
     func_mode,
     func_sd_mode_bilinear,
@@ -22,6 +22,8 @@ from KuehnEtAl2023.functions import (
 
 # Test setup
 RTOL = 2e-2
+STYLE = "strike-slip"
+FILE = "strike-slip_mean-model.csv"
 
 # Add path for expected outputs
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -31,13 +33,12 @@ sys.path.append(str(SCRIPT_DIR.parent))
 # Load the expected outputs, run tests
 @pytest.fixture
 def results_data():
-    ffp = SCRIPT_DIR / "expected_output" / "strike-slip_mean-model.csv"
+    ffp = SCRIPT_DIR / "expected_output" / FILE
     return np.genfromtxt(ffp, delimiter=",", skip_header=1, dtype=None)
 
 
 def test_strike_slip_mean_model(results_data):
-    coeffs = load_data("strike-slip")
-    coeffs = coeffs.mean(axis=0).to_frame().transpose()
+    coeffs = POSTERIOR_MEAN.get(STYLE)
     for row in results_data:
         # Inputs
         magnitude = row[0]
