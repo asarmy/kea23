@@ -58,7 +58,7 @@ def _calc_distrib_params_elliptical(*, magnitude, location):
     xstar = _calc_xstar(location=location)
     mu = b * xstar + a * magnitude + c
 
-    return mu, sigma
+    return mu, np.full(len(mu), sigma)
 
 
 def _calc_distrib_params_quadratic(*, magnitude, location):
@@ -91,7 +91,7 @@ def _calc_distrib_params_quadratic(*, magnitude, location):
 
     mu = a * magnitude + b * folded_location + c * np.power(folded_location, 2) + d
 
-    return mu, sigma
+    return mu, np.full(len(mu), sigma)
 
 
 def _calc_distrib_params_bilinear(*, magnitude, location):
@@ -124,11 +124,11 @@ def _calc_distrib_params_bilinear(*, magnitude, location):
 
     l_L_prime = 1 / b * ((a2 - a1) * magnitude + (c2 - c1))
 
-    if folded_location < l_L_prime:
-        mu = a1 * magnitude + b * folded_location + c1
-        sigma = sigma1
-    else:
-        mu = a2 * magnitude + c2
-        sigma = sigma2
+    mu = np.where(
+        folded_location < l_L_prime,
+        a1 * magnitude + b * folded_location + c1,
+        a2 * magnitude + c2,
+    )
+    sigma = np.where(folded_location < l_L_prime, sigma1, sigma2)
 
     return mu, sigma

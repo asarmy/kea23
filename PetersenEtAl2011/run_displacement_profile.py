@@ -1,6 +1,5 @@
-"""This file runs the PEA11 principal fault displacement model to create a slip profile for a
-single scenario.
-- A single scenario is defined as one magnitude, one style, and one percentile.
+"""This file runs the PEA11 principal fault displacement model to create a slip profile.
+- Any number of scenarios are allowed (e.g., user can enter multiple magnitudes).
 - The results are returned in a pandas DataFrame.
 - Only the principal fault displacement models for direct (i.e., not normalized) predictions are
 implemented herein currently.
@@ -16,47 +15,47 @@ across l/L', there is a weird step in any profile that is not median. Confirm th
 issue and not misunderstanding in implementation.
 """
 
+
 # Python imports
 import argparse
-import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
-# Add path for module
-# FIXME: shouldn't need this with a package install (`__init__` should suffice)
-MODEL_DIR = Path(__file__).resolve().parents[1]
-sys.path.append(str(MODEL_DIR))
+from typing import Union, List
 
 # Module imports
+import model_config  # noqa: F401
 from PetersenEtAl2011.run_displacement_model import run_model
-
-# Adjust display for readability
-pd.set_option("display.max_columns", 50)
-pd.set_option("display.width", 500)
 
 
 def run_profile(
-    magnitude, percentile, submodel="elliptical", style="strike-slip", location_step=0.05
-):
+    *,
+    magnitude: Union[float, int, List[Union[float, int]], np.ndarray],
+    percentile: Union[float, int, List[Union[float, int]], np.ndarray],
+    submodel: str = "elliptical",
+    style: str = "strike-slip",
+    location_step: float = 0.05,
+) -> pd.DataFrame:
     """
-    Run PEA11 principal fault displacement model to create slip profile for a single scenario.
+    Run PEA11 principal fault displacement model to create slip profile. All parameters must be
+    passed as keyword arguments. Any number of scenarios (i.e., magnitude inputs, percentile
+    inputs, etc.) are allowed.
 
     Parameters
     ----------
-    magnitude : float
-        Earthquake moment magnitude. Only one value allowed.
+    magnitude : Union[float, list, numpy.ndarray]
+        Earthquake moment magnitude.
 
-    percentile : float
-        Percentile value. Use -1 for mean. Only one value allowed.
+    percentile : Union[float, list, numpy.ndarray]
+        Aleatory quantile value. Use -1 for mean.
 
-    submodel : str, optional
-        PEA11 shape model name. Default is 'elliptical'. Valid options are 'elliptical',
-        'quadratic', or 'bilinear'. Only one value allowed.
+    submodel : Union[str, list, numpy.ndarray], optional
+        PEA11 shape model name  (case-insensitive). Default is 'elliptical'. Valid options are 'elliptical',
+        'quadratic', or 'bilinear'.
 
-    style : str, optional
-        Style of faulting (case-sensitive). Default is "strike-slip". Only one value allowed.
+    style : Union[str, list, numpy.ndarray], optional
+        Style of faulting (case-insensitive). Default is "strike-slip".
 
     location_step : float, optional
         Profile step interval in percentage. Default 0.05.
@@ -68,26 +67,26 @@ def run_profile(
         - 'magnitude': Earthquake moment magnitude [from user input].
         - 'location':  Normalized location along rupture length [generated from location_step].
         - 'style': Style of faulting [from user input].
-        - 'percentile': Percentile value [from user input].
+        - 'percentile': Aleatory quantile value [from user input].
         - 'model_name': Profile shape model name [from user input].
         - 'mu': Natural log transform of mean displacement in cm.
         - 'sigma': Standard deviation in same units as `mu`.
         - 'displ': Displacement in meters.
 
-    Raises
+    Raises (inherited from `run_displacement_model.py`)
     ------
     TypeError
-        If more than one value is provided for `magnitude`, `submodel`, `style`, or `percentile`.
+        If invalid `submodel` is provided.
 
-    Warns
+    Warns  (inherited from `run_displacement_model.py`)
     -----
     UserWarning
-        If an unsupported `style` is provided.
+        If an unsupported `style` is provided. The user input will be over-ridden with 'strike-slip'.
 
     Notes
     ------
     Command-line interface usage
-        Run (e.g.) `python run_displacement_profile.py --magnitude 7 --percentile 0.5 -shape bilinear -step 0.01`
+        Run (e.g.) `python run_displacement_profile.py --magnitude 7 7.5 --percentile 0.5 -shape bilinear -step 0.01`
         Run `python run_displacement_profile.py --help`
 
     #TODO
@@ -97,51 +96,25 @@ def run_profile(
     Raise a UserWarning for magntiudes outside recommended ranges.
     """
 
-    # Check for only one scenario
-    for variable in [magnitude, percentile]:
-        if not isinstance(variable, (float, int, np.int32)):
-            raise TypeError(
-                f"Expected a float or int, got '{variable}', which is a {type(variable).__name__}."
-                f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-            )
-
-    if not isinstance(style, (str)):
-        raise TypeError(
-            f"Expected a string, got '{style}', which is a {type(style).__name__}."
-            f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-        )
-
-    if not isinstance(submodel, (str)):
-        raise TypeError(
-            f"Expected a string, got '{submodel}', which is a {type(submodel).__name__}."
-            f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-        )
-
     # NOTE: Check for appropriate style is handled in `run_model`
 
     # Create profile location array
-    locations = np.arange(0, 1 + location_step, location_step).tolist()
+    locations = np.arange(0, 1 + location_step, location_step)
 
-    # Calculations
-    run_results = []
-    for location in locations:
-        results = run_model(
-            magnitude=magnitude,
-            location=location,
-            percentile=percentile,
-            submodel=submodel,
-            style=style,
-        )
-        run_results.append(results)
+    dataframe = run_model(
+        magnitude=magnitude,
+        location=locations,
+        percentile=percentile,
+        submodel=submodel,
+        style=style,
+    )
 
-    dataframe = pd.concat(run_results, ignore_index=True)
-
-    return dataframe
+    return dataframe.sort_values(by=["magnitude", "model_name", "percentile", "location"])
 
 
 def main():
-    description_text = """Run PEA11 principal fault displacement model to create slip profile for
-    a single scenario.
+    description_text = """Run PEA11 principal fault displacement model to create slip profile. Any
+    number of scenarios are allowed (e.g., user can enter multiple magnitudes or submodels).
 
     Returns
     -------
@@ -150,7 +123,7 @@ def main():
         - 'magnitude': Earthquake moment magnitude [from user input].
         - 'location':  Normalized location along rupture length [generated from location_step].
         - 'style': Style of faulting [from user input].
-        - 'percentile': Percentile value [from user input].
+        - 'percentile': Aleatory quantile value [from user input].
         - 'model_name': Profile shape model name [from user input].
         - 'mu': Natural log transform of mean displacement in cm.
         - 'sigma': Standard deviation in same units as `mu`.
@@ -164,30 +137,34 @@ def main():
         "-m",
         "--magnitude",
         required=True,
+        nargs="+",
         type=float,
-        help="Earthquake moment magnitude. Only one value allowed.",
+        help="Earthquake moment magnitude.",
     )
     parser.add_argument(
         "-p",
         "--percentile",
         required=True,
+        nargs="+",
         type=float,
-        help="Percentile value. Use -1 for mean. Only one value allowed.",
+        help="Aleatory quantile value. Use -1 for mean.",
     )
     parser.add_argument(
         "-shape",
         "--submodel",
         default="elliptical",
-        type=str,
+        nargs="+",
+        type=str.lower,
         choices=("elliptical", "quadratic", "bilinear"),
-        help="PEA11 shape model name (case-sensitive). Default is 'elliptical'. Only one value allowed.",
+        help="PEA11 shape model name (case-insensitive). Default is 'elliptical'.",
     )
     parser.add_argument(
         "-s",
         "--style",
         default="strike-slip",
-        type=str,
-        help="Style of faulting. Default is 'strike-slip'; other styles not recommended. Only one value allowed.",
+        nargs="+",
+        type=str.lower,
+        help="Style of faulting (case-insensitive). Default is 'strike-slip'; other styles not recommended.",
     )
     parser.add_argument(
         "-step",
@@ -206,7 +183,13 @@ def main():
     location_step = args.location_step
 
     try:
-        results = run_profile(magnitude, percentile, submodel, style, location_step)
+        results = run_profile(
+            magnitude=magnitude,
+            percentile=percentile,
+            submodel=submodel,
+            style=style,
+            location_step=location_step,
+        )
         print(results)
 
         # Prompt to save results to CSV

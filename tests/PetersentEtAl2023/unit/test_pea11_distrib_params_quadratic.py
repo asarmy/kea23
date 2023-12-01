@@ -34,7 +34,7 @@ def test_calc(load_data_as_recarray):
         expected_mu, expected_sigma = row["mu"], row["sigma"]
 
         # Perform calculation
-        mu, sigma = FUNCTION(magnitude=mag, location=loc)
+        mu, sigma = FUNCTION(magnitude=np.asarray([mag]), location=np.asarray([loc]))
 
         # Check mu
         np.testing.assert_allclose(

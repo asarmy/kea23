@@ -1,5 +1,5 @@
-"""This file runs the PEA11 principal fault displacement model for a single scenario.
-- A single scenario is defined as one magnitude, one u_star location, one style, and one percentile.
+"""This file runs the PEA11 principal fault displacement model.
+- Any number of scenarios are allowed (e.g., user can enter multiple magnitudes).
 - The results are returned in a pandas DataFrame.
 - Only the principal fault displacement models for direct (i.e., not normalized) predictions are
 implemented herein currently.
@@ -9,54 +9,106 @@ implemented herein currently.
 Reference: https://doi.org/10.1785/0120100035
 """
 
+
 # Python imports
 import argparse
-import sys
 import warnings
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from itertools import product
 from scipy import stats
-
-# Add path for module
-# FIXME: shouldn't need this with a package install (`__init__` should suffice)
-MODEL_DIR = Path(__file__).resolve().parents[1]
-sys.path.append(str(MODEL_DIR))
+from typing import Union, List
 
 # Module imports
+import model_config  # noqa: F401
 from PetersenEtAl2011.functions import (
     _calc_distrib_params_elliptical,
     _calc_distrib_params_quadratic,
     _calc_distrib_params_bilinear,
 )
 
-# Adjust display for readability
-pd.set_option("display.max_columns", 50)
-pd.set_option("display.width", 500)
 
-
-def run_model(magnitude, location, percentile, submodel="elliptical", style="strike-slip"):
+def _calc_distrib_params(*, magnitude, location, submodel):
     """
-    Run PEA11 principal fault displacement model for a single scenario.
+    A vectorized helper function to calculate predicted distribution parameters.
 
     Parameters
     ----------
     magnitude : float
-        Earthquake moment magnitude. Only one value allowed.
+        Earthquake moment magnitude.
 
     location : float
-        Normalized location along rupture length, range [0, 1.0]. Only one value allowed.
+        Normalized location along rupture length, range [0, 1.0].
 
-    percentile : float
-        Percentile value. Use -1 for mean. Only one value allowed.
+    submodel : str
+        PEA11 shape model name. Valid options are 'elliptical', 'quadratic', or 'bilinear'.
 
-    submodel : str, optional
-        PEA11 shape model name. Default is 'elliptical'. Valid options are 'elliptical',
-        'quadratic', or 'bilinear'. Only one value allowed.
+    Returns
+    -------
+    Tuple[float, float]
+        mu : Mean prediction.
+        sigma : Total standard deviation.
 
-    style : str, optional
-        Style of faulting (case-sensitive). Default is "strike-slip". Only one value allowed.
+    Notes
+    ------
+    Mu and sigma are in natural log units. Exp(mu) is in centimeters, not meters.
+    """
+
+    # Calculate for all submodels
+    # NOTE: it is actually faster to just do this instead of if/else, loops, etc.
+    result_elliptical = _calc_distrib_params_elliptical(magnitude=magnitude, location=location)
+    result_quadratic = _calc_distrib_params_quadratic(magnitude=magnitude, location=location)
+    result_bilinear = _calc_distrib_params_bilinear(magnitude=magnitude, location=location)
+
+    # Conditions for np.select
+    conditions = [
+        submodel == "elliptical",
+        submodel == "quadratic",
+        submodel == "bilinear",
+    ]
+
+    # Choices for mu and sigma
+    choices_mu = [result_elliptical[0], result_quadratic[0], result_bilinear[0]]
+    choices_sigma = [result_elliptical[1], result_quadratic[1], result_bilinear[1]]
+
+    # Use np.select to get the final mu and sigma
+    mu = np.select(conditions, choices_mu, default=np.nan)
+    sigma = np.select(conditions, choices_sigma, default=np.nan)
+
+    return mu, sigma
+
+
+def run_model(
+    *,
+    magnitude: Union[float, int, List[Union[float, int]], np.ndarray],
+    location: Union[float, int, List[Union[float, int]], np.ndarray],
+    percentile: Union[float, int, List[Union[float, int]], np.ndarray],
+    submodel: str = "elliptical",
+    style: str = "strike-slip",
+) -> pd.DataFrame:
+    """
+    Run PEA11 principal fault displacement model. All parameters must be passed as keyword
+    arguments. Any number of scenarios (i.e., magnitude inputs, location inputs, etc.) are allowed.
+
+    Parameters
+    ----------
+    magnitude : Union[float, list, numpy.ndarray]
+        Earthquake moment magnitude.
+
+    location : Union[float, list, numpy.ndarray]
+        Normalized location along rupture length, range [0, 1.0].
+
+    percentile : Union[float, list, numpy.ndarray]
+        Aleatory quantile value. Use -1 for mean.
+
+    submodel : Union[str, list, numpy.ndarray], optional
+        PEA11 shape model name (case-insensitive). Default is 'elliptical'. Valid options are 'elliptical',
+        'quadratic', or 'bilinear'.
+
+    style : Union[str, list, numpy.ndarray], optional
+        Style of faulting (case-insensitive). Default is "strike-slip".
 
     Returns
     -------
@@ -65,7 +117,7 @@ def run_model(magnitude, location, percentile, submodel="elliptical", style="str
         - 'magnitude': Earthquake moment magnitude [from user input].
         - 'location':  Normalized location along rupture length [from user input].
         - 'style': Style of faulting [from user input].
-        - 'percentile': Percentile value [from user input].
+        - 'percentile': Aleatory quantile value [from user input].
         - 'model_name': Profile shape model name [from user input].
         - 'mu': Natural log transform of mean displacement in cm.
         - 'sigma': Standard deviation in same units as `mu`.
@@ -74,18 +126,17 @@ def run_model(magnitude, location, percentile, submodel="elliptical", style="str
     Raises
     ------
     TypeError
-        If more than one value is provided for `magnitude`, `location`, `submodel`, `style`, or
-        `percentile`.
+        If invalid `submodel` is provided.
 
     Warns
     -----
     UserWarning
-        If an unsupported `style` is provided.
+        If an unsupported `style` is provided. The user input will be over-ridden with 'strike-slip'.
 
     Notes
     ------
     Command-line interface usage
-        Run (e.g.) `python run_displacement_model.py --magnitude 7 --location 0.5 --percentile 0.5 --submodel quadratic`
+        Run (e.g.) `python run_displacement_model.py --magnitude 7 --location 0.5 --percentile 0.5 --submodel quadratic elliptical`
         Run `python run_displacement_model.py --help`
 
     #TODO
@@ -95,66 +146,62 @@ def run_model(magnitude, location, percentile, submodel="elliptical", style="str
     Raise a UserWarning for magntiudes outside recommended ranges.
     """
 
-    # Check style
+    # Check for allowable styles, then over-ride
     if style not in ("strike-slip", "Strike-Slip"):
         warnings.warn(
-            f"This model is only recommended for strike-slip faulting, but '{style}' was entered.",
+            f"This model is only recommended for strike-slip faulting, but '{style}' was entered."
+            f"User input will be over-ridden.",
             category=UserWarning,
         )
+        style = "strike-slip"
 
-    # Check for only one scenario
-    for variable in [magnitude, location, percentile]:
-        if not isinstance(variable, (float, int, np.int32)):
-            raise TypeError(
-                f"Expected a float or int, got '{variable}', which is a {type(variable).__name__}."
-                f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-            )
+    # Check if there are any invalid submodels
+    supported_submodels = ["elliptical", "quadratic", "bilinear"]
+    invalid_mask = ~np.isin(submodel, supported_submodels)
 
-    if not isinstance(style, (str)):
-        raise TypeError(
-            f"Expected a string, got '{style}', which is a {type(style).__name__}."
-            f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-        )
-
-    if not isinstance(submodel, (str)):
-        raise TypeError(
-            f"Expected a string, got '{submodel}', which is a {type(submodel).__name__}."
-            f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-        )
-
-    # Check for supported submodels
-    supported_submodels = {
-        "elliptical": _calc_distrib_params_elliptical,
-        "quadratic": _calc_distrib_params_quadratic,
-        "bilinear": _calc_distrib_params_bilinear,
-    }
-
-    func = supported_submodels.get(submodel)
-
-    if func is None:
+    # Check if there are any invalid submodels
+    if np.any(invalid_mask):
+        invalid_submodels = np.asarray(submodel)[invalid_mask]
         raise ValueError(
-            f"Invalid submodel name. Valid options are {list(supported_submodels.keys())} (case-sensitive)."
+            f"Invalid submodel names: {invalid_submodels}. Supported submodels are {supported_submodels}."
         )
+
+    # Vectorize scenarios
+    scenarios = product(
+        [magnitude] if not isinstance(magnitude, (list, np.ndarray)) else magnitude,
+        [location] if not isinstance(location, (list, np.ndarray)) else location,
+        [percentile] if not isinstance(percentile, (list, np.ndarray)) else percentile,
+        [submodel] if not isinstance(submodel, (list, np.ndarray)) else submodel,
+    )
+    magnitude, location, percentile, submodel = map(np.array, zip(*scenarios))
 
     # Calculate distribution parameters
-    mu, sigma = func(magnitude=magnitude, location=location)
+    mu, sigma = _calc_distrib_params(magnitude=magnitude, location=location, submodel=submodel)
 
-    # Calculate natural log of displacement
-    if percentile == -1:
-        ln_displ = mu + np.power(sigma, 2) / 2
+    # Calculate natural log of displacement (vectorized approach)
+    if np.any(percentile == -1):
+        # Compute the mean
+        ln_displ_mean = mu + np.power(sigma, 2) / 2
     else:
-        ln_displ = stats.norm.ppf(percentile, loc=mu, scale=sigma)
+        ln_displ_mean = np.nan
+
+    # Compute the aleatory quantile
+    ln_displ_normal = stats.norm.ppf(percentile, loc=mu, scale=sigma)
+
+    # Use np.where for vectorization
+    ln_displ = np.where(percentile == -1, ln_displ_mean, ln_displ_normal)
 
     # NOTE: exp(mu) is in centimeters, must be converted to  meters.
     D = np.exp(ln_displ) / 100
 
     # Create a DataFrame
-    col_vals = (
+    n = len(magnitude)
+    results = (
         magnitude,
         location,
-        style,
+        np.full(n, style),
         percentile,
-        submodel,
+        np.full(n, submodel),
         mu,
         sigma,
         D,
@@ -170,14 +217,15 @@ def run_model(magnitude, location, percentile, submodel="elliptical", style="str
         "sigma": float,
         "displ": float,
     }
-    dataframe = pd.DataFrame(np.column_stack(col_vals), columns=cols_dict.keys())
+    dataframe = pd.DataFrame(np.column_stack(results), columns=cols_dict.keys())
     dataframe = dataframe.astype(cols_dict)
 
     return dataframe
 
 
 def main():
-    description_text = """Run PEA11 principal fault displacement model for a single scenario.
+    description_text = """Run PEA11 principal fault displacement model. Any number of scenarios are
+    allowed (e.g., user can enter multiple magnitudes or locations).
 
     Returns
     -------
@@ -186,7 +234,7 @@ def main():
         - 'magnitude': Earthquake moment magnitude [from user input].
         - 'location':  Normalized location along rupture length [from user input].
         - 'style': Style of faulting [from user input].
-        - 'percentile': Percentile value [from user input].
+        - 'percentile': Aleatory quantile value [from user input].
         - 'model_name': Profile shape model name [from user input].
         - 'mu': Natural log transform of mean displacement in cm.
         - 'sigma': Standard deviation in same units as `mu`.
@@ -200,37 +248,42 @@ def main():
         "-m",
         "--magnitude",
         required=True,
+        nargs="+",
         type=float,
-        help="Earthquake moment magnitude. Only one value allowed.",
+        help="Earthquake moment magnitude.",
     )
     parser.add_argument(
         "-l",
         "--location",
         required=True,
+        nargs="+",
         type=float,
-        help="Normalized location along rupture length, range [0, 1.0]. Only one value allowed.",
+        help="Normalized location along rupture length, range [0, 1.0].",
     )
     parser.add_argument(
         "-p",
         "--percentile",
         required=True,
+        nargs="+",
         type=float,
-        help=" Percentile value. Use -1 for mean. Only one value allowed.",
+        help=" Aleatory quantile value. Use -1 for mean.",
     )
     parser.add_argument(
         "-shape",
         "--submodel",
         default="elliptical",
-        type=str,
+        nargs="+",
+        type=str.lower,
         choices=("elliptical", "quadratic", "bilinear"),
-        help="PEA11 shape model name (case-sensitive). Default is 'elliptical'. Only one value allowed.",
+        help="PEA11 shape model name (case-insensitive). Default is 'elliptical'.",
     )
     parser.add_argument(
         "-s",
         "--style",
         default="strike-slip",
-        type=str,
-        help="Style of faulting. Default is 'strike-slip'; other styles not recommended. Only one value allowed.",
+        nargs="+",
+        type=str.lower,
+        help="Style of faulting (case-insensitive). Default is 'strike-slip'; other styles not recommended.",
     )
 
     args = parser.parse_args()
@@ -242,7 +295,13 @@ def main():
     style = args.style
 
     try:
-        results = run_model(magnitude, location, percentile, submodel, style)
+        results = run_model(
+            magnitude=magnitude,
+            location=location,
+            percentile=percentile,
+            submodel=submodel,
+            style=style,
+        )
         print(results)
 
         # Prompt to save results to CSV

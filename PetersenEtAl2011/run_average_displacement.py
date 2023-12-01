@@ -1,6 +1,6 @@
 """This file runs the PEA11 principal fault displacement model to calculate the average
-displacement that is implied by the model prediction for a single scenario.
-- A single scenario is defined as one magnitude and one style.
+displacement that is implied by the model prediction.
+- Any number of scenarios are allowed (e.g., user can enter multiple magnitudes).
 - The model-implied Average Displacement is calculated as the area under the mean slip profile.
 - The results are returned in a pandas DataFrame.
 - Only the principal fault displacement models for direct (i.e., not normalized) predictions are
@@ -12,48 +12,45 @@ implemented herein currently.
 
 Reference: https://doi.org/10.1785/0120100035
 
-# TODO: There is a potential issue with the bilinear model. Because the standard deviation changes
-across l/L', there is a weird step in any profile that is not median. Confirm this is a model
-issue and not misunderstanding in implementation. The issue affects the AD calc for bilinear model.
 """
+
 
 # Python imports
 import argparse
-import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
-# Add path for module
-# FIXME: shouldn't need this with a package install (`__init__` should suffice)
-MODEL_DIR = Path(__file__).resolve().parents[1]
-sys.path.append(str(MODEL_DIR))
+from typing import Union, List
 
 # Module imports
+import model_config  # noqa: F401
 from PetersenEtAl2011.run_displacement_profile import run_profile
 
-# Adjust display for readability
-pd.set_option("display.max_columns", 50)
-pd.set_option("display.width", 500)
 
-
-def run_ad(magnitude, submodel="elliptical", style="strike-slip"):
+def run_ad(
+    *,
+    magnitude: Union[float, int, List[Union[float, int]], np.ndarray],
+    submodel: str = "elliptical",
+    style: str = "strike-slip",
+) -> pd.DataFrame:
     """
     Run PEA11 principal fault displacement model to calculate the average displacement that is
-    implied by the model prediction for a single scenario.
+    implied by the model prediction. All parameters must be passed as keyword arguments. Any number
+    of scenarios (i.e., magnitude inputs, submodel inputs, etc.) are allowed.
 
     Parameters
     ----------
-    magnitude : float
-        Earthquake moment magnitude. Only one value allowed.
+    magnitude : Union[float, list, numpy.ndarray]
+        Earthquake moment magnitude.
 
-    submodel : str, optional
-        PEA11 shape model name. Default is 'elliptical'. Valid options are 'elliptical',
-        'quadratic', or 'bilinear'. Only one value allowed.
+    submodel : Union[str, list, numpy.ndarray], optional
+        PEA11 shape model name  (case-insensitive). Default is 'elliptical'. Valid options are 'elliptical',
+        'quadratic', or 'bilinear'.
 
-    style : str, optional
-        Style of faulting (case-sensitive). Default is "strike-slip". Only one value allowed.
+
+    style : Union[str, list, numpy.ndarray], optional
+        Style of faulting (case-insensitive). Default is "strike-slip".
 
     Returns
     -------
@@ -62,48 +59,28 @@ def run_ad(magnitude, submodel="elliptical", style="strike-slip"):
         - 'magnitude': Earthquake moment magnitude [from user input].
         - 'style': Style of faulting [from user input].
         - 'model_name': Profile shape model name [from user input].
-        - 'avg_displ': Averaged displacement in meters.
+        - 'avg_displ': Average displacement in meters.
 
-    Raises
+    Raises (inherited from `run_displacement_model.py`)
     ------
     TypeError
-        If more than one value is provided for `magnitude`, `submodel`, or `style`.
+        If invalid `submodel` is provided.
 
-    Warns
+    Warns  (inherited from `run_displacement_model.py`)
     -----
     UserWarning
-        If an unsupported `style` is provided.
+        If an unsupported `style` is provided. The user input will be over-ridden with 'strike-slip'.
 
     Notes
     ------
     Command-line interface usage
-        Run (e.g.) `python run_average_displacement.py --magnitude 7 --submodel quadratic`
+        Run (e.g.) `python run_average_displacement.py --magnitude 7 7.5 --submodel quadratic`
         Run `python run_average_displacement.py --help`
 
     #TODO
     ------
     Raise a UserWarning for magntiudes outside recommended ranges.
-    This runs very slowly when you loop through magnitudes (e.g., creating an M-AD plot). Vectorize somehow (move to numpy? cython?)
     """
-
-    # Check for only one scenario
-    if not isinstance(magnitude, (float, int, np.int32)):
-        raise TypeError(
-            f"Expected a float or int, got '{magnitude}', which is a {type(magnitude).__name__}."
-            f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-        )
-
-    if not isinstance(style, (str)):
-        raise TypeError(
-            f"Expected a string, got '{style}', which is a {type(style).__name__}."
-            f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-        )
-
-    if not isinstance(submodel, (str)):
-        raise TypeError(
-            f"Expected a string, got '{submodel}', which is a {type(submodel).__name__}."
-            f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-        )
 
     # NOTE: Check for appropriate style is handled upstream
 
@@ -111,31 +88,50 @@ def run_ad(magnitude, submodel="elliptical", style="strike-slip"):
     # NOTE: `percentile=-1` is used for mean
     # NOTE: `location_step=0.01` is used to create well-descritized profile for intergration
     results = run_profile(
-        magnitude=magnitude, percentile=-1, submodel=submodel, style=style, location_step=0.01
+        magnitude=magnitude,
+        percentile=-1,
+        submodel=submodel,
+        style=style,
+        location_step=0.01,
     )
+
+    # Group by both magnitude and submodel shape
+    grouped = results.groupby(["magnitude", "model_name", "style"])
 
     # Calculate area under the mean slip profile; this is the Average Displacement (AD)
-    x, y = results["location"], results["displ"]
-    area = np.trapz(y, x)
+    # NOTE: use dictionary comprehension, it is probably slightly faster than apply lambda
+    areas = {
+        (mag, model, style): np.trapz(group["displ"], group["location"])
+        for (mag, model, style), group in grouped
+    }
 
     # Create output dataframe
-    model_id = results["model_name"].iloc[0]
-    dataframe = pd.concat(
-        [
-            pd.Series(magnitude, name="magnitude"),
-            pd.Series(style, name="style"),
-            pd.Series(model_id, name="model_name"),
-            pd.Series(area, name="avg_displ"),
-        ],
-        axis=1,
+    magnitudes, model_names, styles, area_values = zip(
+        *[(mag, model, style, area) for (mag, model, style), area in areas.items()]
     )
+
+    values = (
+        list(magnitudes),
+        list(model_names),
+        list(styles),
+        list(area_values),
+    )
+
+    type_dict = {
+        "magnitude": float,
+        "style": str,
+        "model_name": str,
+        "avg_displ": float,
+    }
+    dataframe = pd.DataFrame(np.column_stack(values), columns=type_dict.keys())
+    dataframe = dataframe.astype(type_dict)
 
     return dataframe
 
 
 def main():
     description_text = """Run PEA11 principal fault displacement model to calculate the average displacement that is
-    implied by the model prediction for a single scenario.
+    implied by the model prediction. Any number of scenarios (i.e., magnitude inputs, submodel inputs, etc.) are allowed.
 
     Returns
     -------
@@ -144,7 +140,7 @@ def main():
         - 'magnitude': Earthquake moment magnitude [from user input].
         - 'style': Style of faulting [from user input].
         - 'model_name': Profile shape model name [from user input].
-        - 'avg_displ': Averaged displacement in meters.
+        - 'avg_displ': Average displacement in meters.
     """
 
     parser = argparse.ArgumentParser(
@@ -154,23 +150,26 @@ def main():
         "-m",
         "--magnitude",
         required=True,
+        nargs="+",
         type=float,
-        help="Earthquake moment magnitude. Only one value allowed.",
+        help="Earthquake moment magnitude.",
     )
     parser.add_argument(
         "-shape",
         "--submodel",
         default="elliptical",
-        type=str,
+        nargs="+",
+        type=str.lower,
         choices=("elliptical", "quadratic", "bilinear"),
-        help="PEA11 shape model name (case-sensitive). Default is 'elliptical'. Only one value allowed.",
+        help="PEA11 shape model name (case-insensitive). Default is 'elliptical'.",
     )
     parser.add_argument(
         "-s",
         "--style",
         default="strike-slip",
-        type=str,
-        help="Style of faulting. Default is 'strike-slip'; other styles not recommended. Only one value allowed.",
+        nargs="+",
+        type=str.lower,
+        help="Style of faulting (case-insensitive). Default is 'strike-slip'; other styles not recommended.",
     )
 
     args = parser.parse_args()
@@ -180,7 +179,7 @@ def main():
     style = args.style
 
     try:
-        results = run_ad(magnitude, submodel, style)
+        results = run_ad(magnitude=magnitude, submodel=submodel, style=style)
         print(results)
 
         # Prompt to save results to CSV
