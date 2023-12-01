@@ -1,6 +1,5 @@
-"""This file runs the MR11 model to calculate the average displacement as a function of magnitude
-for a single scenario.
-- A single scenario is defined as one magnitude and one style.
+"""This file runs the MR11 model to calculate the average displacement as a function of magnitude.
+- Any number of scenarios are allowed (e.g., user can enter multiple magnitudes).
 - The results are returned in a pandas DataFrame.
 - Command-line use is supported; try `python run_average_displacement.py --help`
 - Module use is supported; try `from run_average_displacement import run_ad`
@@ -8,44 +7,44 @@ for a single scenario.
 Reference: https://doi.org/10.1785/BSSA0840040974
 """
 
+
 # Python imports
 import argparse
-import sys
 import warnings
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from itertools import product
 from scipy import stats
-
-# Add path for module
-# FIXME: shouldn't need this with a package install (`__init__` should suffice)
-MODEL_DIR = Path(__file__).resolve().parents[1]
-sys.path.append(str(MODEL_DIR))
+from typing import Union, List
 
 # Module imports
+import model_config  # noqa: F401
 from MossRoss2011.functions import _calc_distrib_params_mag_ad
 
-# Adjust display for readability
-pd.set_option("display.max_columns", 50)
-pd.set_option("display.width", 500)
 
-
-def run_ad(magnitude, percentile=0.5, style="reverse"):
+def run_ad(
+    *,
+    magnitude: Union[float, int, List[Union[float, int]], np.ndarray],
+    percentile: Union[float, int, List[Union[float, int]], np.ndarray] = 0.5,
+    style: str = "reverse",
+) -> pd.DataFrame:
     """
-    Run MR11 model to calculate the average displacement as a function of magnitude for a single
-    scenario.
+    Run MR11 model to calculate the average displacement as a function of magnitude. All parameters
+    must be passed as keyword arguments. Any number of scenarios (i.e., magnitude inputs,
+    percentile inputs, etc.) are allowed.
 
     Parameters
     ----------
-    magnitude : float
-        Earthquake moment magnitude. Only one value allowed.
+    magnitude : Union[float, list, numpy.ndarray]
+        Earthquake moment magnitude.
 
-    percentile : float, optional
-        Percentile value. Default is 0.5. Use -1 for mean. Only one value allowed.
+    percentile : Union[float, list, numpy.ndarray], optional
+        Aleatory quantile value. Default is 0.5. Use -1 for mean.
 
     style : str, optional
-        Style of faulting (case-insensitive). Default is 'reverse'. Only one value allowed.
+        Style of faulting (case-insensitive). Default is 'reverse'.
 
     Returns
     -------
@@ -53,25 +52,20 @@ def run_ad(magnitude, percentile=0.5, style="reverse"):
         A DataFrame with the following columns:
         - 'magnitude': Earthquake moment magnitude [from user input].
         - 'style': Style of faulting [from user input].
-        - 'percentile': Percentile value [from user input].
+        - 'percentile': Aleatory quantile value [from user input].
         - 'mu': Log10 transform of mean displacement in m.
         - 'sigma': Standard deviation in same units as `mu`.
-        - 'avg_displ': Averaged displacement in meters.
-
-    Raises
-    ------
-    TypeError
-        If more than one value is provided for `magnitude`, `percentile`, or `style`.
+        - 'avg_displ': Average displacement in meters.
 
     Warns
     -----
     UserWarning
-        If an unsupported `style` is provided.
+        If an unsupported `style` is provided. The user input will be over-ridden with 'reverse'.
 
     Notes
     ------
     Command-line interface usage
-        Run (e.g.) `python run_average_displacement.py --magnitude 7`
+        Run (e.g.) `python run_average_displacement.py --magnitude 6 7`
         Run `python run_average_displacement.py --help`
 
     #TODO
@@ -79,58 +73,70 @@ def run_ad(magnitude, percentile=0.5, style="reverse"):
     Raise a UserWarning for magntiudes outside recommended ranges.
     """
 
-    # Check style
+    # Check for allowable styles, then over-ride
     if style not in ("reverse", "Reverse"):
         warnings.warn(
-            f"This model is only recommended for reverse faulting, but '{style}' was entered.",
+            f"This model is only recommended for strike-slip faulting, but '{style}' was entered."
+            f"User input will be over-ridden.",
             category=UserWarning,
         )
+        style = "reverse"
 
-    # Check for only one scenario
-    for variable in [magnitude, percentile]:
-        if not isinstance(variable, (float, int, np.int32)):
-            raise TypeError(
-                f"Expected a float or int, got '{variable}', which is a {type(variable).__name__}."
-                f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-            )
-
-    if not isinstance(style, (str)):
-        raise TypeError(
-            f"Expected a string, got '{style}', which is a {type(style).__name__}."
-            f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-        )
+    # Vectorize scenarios
+    scenarios = product(
+        [magnitude] if not isinstance(magnitude, (list, np.ndarray)) else magnitude,
+        [percentile] if not isinstance(percentile, (list, np.ndarray)) else percentile,
+    )
+    magnitude, percentile = map(np.array, zip(*scenarios))
 
     # Calculate distribution parameters
     mu, sigma = _calc_distrib_params_mag_ad(magnitude=magnitude)
 
-    # Calculate log of displacement
-    if percentile == -1:
-        log10_displ = mu + (np.log(10) / 2 * np.power(sigma, 2))
+    # Calculate natural log of displacement (vectorized approach)
+    if np.any(percentile == -1):
+        # Compute the mean
+        log10_displ_mean = mu + (np.log(10) / 2 * np.power(sigma, 2))
     else:
-        log10_displ = stats.norm.ppf(percentile, loc=mu, scale=sigma)
+        log10_displ_mean = np.nan
+
+    # Compute the aleatory quantile
+    log10_displ_normal = stats.norm.ppf(percentile, loc=mu, scale=sigma)
+
+    # Use np.where for vectorization
+    log10_displ = np.where(percentile == -1, log10_displ_mean, log10_displ_normal)
 
     # Calculate displacement
     D = np.power(10, log10_displ)
 
-    # Create output dataframe
-    dataframe = pd.concat(
-        [
-            pd.Series(magnitude, name="magnitude"),
-            pd.Series(style, name="style"),
-            pd.Series(percentile, name="percentile"),
-            pd.Series(mu, name="mu"),
-            pd.Series(sigma, name="sigma"),
-            pd.Series(D, name="avg_displ"),
-        ],
-        axis=1,
+    # Create a DataFrame
+    n = len(magnitude)
+    results = (
+        magnitude,
+        np.full(n, style),
+        percentile,
+        mu,
+        sigma,
+        D,
     )
+
+    cols_dict = {
+        "magnitude": float,
+        "style": str,
+        "percentile": float,
+        "mu": float,
+        "sigma": float,
+        "avg_displ": float,
+    }
+    dataframe = pd.DataFrame(np.column_stack(results), columns=cols_dict.keys())
+    dataframe = dataframe.astype(cols_dict)
 
     return dataframe
 
 
 def main():
     description_text = """Run MR11 model to calculate the average displacement as a function of
-    magnitude for a single scenario.
+    magnitude. Any number of scenarios are allowed (e.g., user can enter multiple magnitudes or
+    percentiles).
 
     Returns
     -------
@@ -138,10 +144,10 @@ def main():
         A DataFrame with the following columns:
         - 'magnitude': Earthquake moment magnitude [from user input].
         - 'style': Style of faulting [from user input].
-        - 'percentile': Percentile value [from user input].
+        - 'percentile': Aleatory quantile value [from user input].
         - 'mu': Log10 transform of mean displacement in m.
         - 'sigma': Standard deviation in same units as `mu`.
-        - 'avg_displ': Averaged displacement in meters.
+        - 'avg_displ': Average displacement in meters.
     """
 
     parser = argparse.ArgumentParser(
@@ -151,22 +157,24 @@ def main():
         "-m",
         "--magnitude",
         required=True,
+        nargs="+",
         type=float,
-        help="Earthquake moment magnitude. Only one value allowed.",
+        help="Earthquake moment magnitude.",
     )
     parser.add_argument(
         "-p",
         "--percentile",
         default=0.5,
+        nargs="+",
         type=float,
-        help=" Percentile value. Default is 0.5. Use -1 for mean. Only one value allowed.",
+        help=" Aleatory quantile value. Default is 0.5. Use -1 for mean.",
     )
     parser.add_argument(
         "-s",
         "--style",
         default="reverse",
-        type=str,
-        help="Style of faulting. Default is 'reverse'; other styles not recommended. Only one value allowed.",
+        type=str.lower,
+        help="Style of faulting (case-insensitive). Default is 'reverse'; other styles not recommended.",
     )
 
     args = parser.parse_args()
@@ -176,7 +184,7 @@ def main():
     style = args.style
 
     try:
-        results = run_ad(magnitude, percentile, style)
+        results = run_ad(magnitude=magnitude, percentile=percentile, style=style)
         print(results)
 
         # Prompt to save results to CSV

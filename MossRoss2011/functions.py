@@ -4,6 +4,8 @@
 Reference: https://doi.org/10.1785/0120100248
 """
 
+import numpy as np
+
 
 def _calc_distrib_params_mag_ad(*, magnitude):
     """
@@ -11,7 +13,7 @@ def _calc_distrib_params_mag_ad(*, magnitude):
 
     Parameters
     ----------
-    magnitude : float
+    magnitude : Union[float, np.ndarray]
         Earthquake moment magnitude.
 
     Returns
@@ -28,7 +30,7 @@ def _calc_distrib_params_mag_ad(*, magnitude):
     a, b, sigma = -2.2192, 0.3244, 0.17
     mu = a + b * magnitude
 
-    return mu, sigma
+    return mu, np.full(len(mu), sigma)
 
 
 def _calc_distrib_params_mag_md(*, magnitude):
@@ -37,7 +39,7 @@ def _calc_distrib_params_mag_md(*, magnitude):
 
     Parameters
     ----------
-    magnitude : float
+    magnitude : Union[float, np.ndarray]
         Earthquake moment magnitude.
 
     Returns
@@ -54,4 +56,4 @@ def _calc_distrib_params_mag_md(*, magnitude):
     a, b, sigma = -3.1971, 0.5102, 0.31
     mu = a + b * magnitude
 
-    return mu, sigma
+    return mu, np.full(len(mu), sigma)

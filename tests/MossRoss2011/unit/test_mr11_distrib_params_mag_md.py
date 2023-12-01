@@ -39,7 +39,7 @@ def test_run_model(results_data):
         sigma_expect = row[2]
 
         # Computed
-        results = _calc_distrib_params_mag_md(magnitude=magnitude)
+        results = _calc_distrib_params_mag_md(magnitude=np.asarray([magnitude]))
         mu_calc = results[0]
         sigma_calc = results[1]
 
