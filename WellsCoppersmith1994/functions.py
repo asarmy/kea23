@@ -6,6 +6,8 @@ Reference: https://doi.org/10.1785/BSSA0840040974
 # NOTE: Only a small subset of the models are implemented herein currently.
 """
 
+import numpy as np
+
 
 def _calc_distrib_params_mag_ad(*, magnitude, style="all"):
     """
@@ -13,7 +15,7 @@ def _calc_distrib_params_mag_ad(*, magnitude, style="all"):
 
     Parameters
     ----------
-    magnitude : float
+    magnitude : Union[float, np.ndarray]
         Earthquake moment magnitude.
 
     style : str, optional
@@ -43,7 +45,7 @@ def _calc_distrib_params_mag_ad(*, magnitude, style="all"):
     a, b, sigma = coeffs[style]
     mu = a + b * magnitude
 
-    return mu, sigma
+    return mu, np.full(len(mu), sigma)
 
 
 def _calc_distrib_params_mag_md(*, magnitude, style="all"):
@@ -52,7 +54,7 @@ def _calc_distrib_params_mag_md(*, magnitude, style="all"):
 
     Parameters
     ----------
-    magnitude : float
+    magnitude : Union[float, np.ndarray]
         Earthquake moment magnitude.
 
     style : str, optional
@@ -82,4 +84,4 @@ def _calc_distrib_params_mag_md(*, magnitude, style="all"):
     a, b, sigma = coeffs[style]
     mu = a + b * magnitude
 
-    return mu, sigma
+    return mu, np.full(len(mu), sigma)

@@ -1,0 +1,25 @@
+import sys
+from pathlib import Path
+
+# Add path for project
+# FIXME: shouldn't need to do this!
+PROJ_DIR = Path(__file__).resolve().parents[1]
+sys.path.append(str(PROJ_DIR))
+del PROJ_DIR
+
+# Import project configurations
+import project_config  # noqa: F401
+
+# Recommended magnitude / allowable styles
+MAG_RANGE_AD_M = {
+    "strike-slip": (5.6, 8.1),
+    "reverse": (5.8, 7.4),
+    "normal": (5.2, 7.3),
+    "all": (5.2, 8.1),
+}
+MAG_RANGE_MD_M = {
+    "strike-slip": (5.6, 8.1),
+    "reverse": (5.4, 7.4),
+    "normal": (6.0, 7.3),
+    "all": (5.6, 8.1),
+}

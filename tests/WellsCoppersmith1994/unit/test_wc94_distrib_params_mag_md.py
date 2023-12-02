@@ -11,28 +11,19 @@ PROJ_DIR = Path(__file__).resolve().parents[3]
 sys.path.append(str(PROJ_DIR))
 
 # Module imports
-from WellsCoppersmith1994.functions import _calc_distrib_params_mag_md
+from WellsCoppersmith1994 import functions as wc94
 
 # Test setup
+FUNCTION = wc94._calc_distrib_params_mag_md
+FILE = "wells_coppersmith_params_mag_md.csv"
 RTOL = 2e-2
 
-# Add path for expected outputs
-SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.append(str(SCRIPT_DIR.parent))
 
-
-# Load the expected outputs, run tests
-@pytest.fixture
-def results_data():
-    ffp = SCRIPT_DIR / "expected_output" / "wells_coppersmith_params_mag_md.csv"
-    dtype = [float, "U20", float, float]
-    return np.genfromtxt(ffp, delimiter=",", skip_header=1, dtype=dtype)
-
-
-def test_run_model(results_data):
-    for row in results_data:
+@pytest.mark.parametrize("filename", [FILE])
+def test_calc(load_data_as_recarray):
+    for row in load_data_as_recarray:
         # Inputs
-        magnitude = row[0]
+        magnitude = np.asarray([row[0]])
         style = row[1]
 
         # Expected
@@ -40,10 +31,7 @@ def test_run_model(results_data):
         sigma_expect = row[3]
 
         # Computed
-        results = _calc_distrib_params_mag_md(
-            magnitude=magnitude,
-            style=style,
-        )
+        results = FUNCTION(magnitude=magnitude, style=style)
         mu_calc = results[0]
         sigma_calc = results[1]
 
