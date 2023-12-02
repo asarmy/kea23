@@ -173,6 +173,7 @@ def main():
         "-s",
         "--style",
         default="reverse",
+        nargs="+",
         type=str.lower,
         help="Style of faulting (case-insensitive). Default is 'reverse'; other styles not recommended.",
     )

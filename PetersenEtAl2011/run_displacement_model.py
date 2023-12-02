@@ -156,10 +156,10 @@ def run_model(
         style = "strike-slip"
 
     # Check if there are any invalid submodels
+    submodel = [x.lower() for x in ([submodel] if isinstance(submodel, str) else submodel)]
     supported_submodels = ["elliptical", "quadratic", "bilinear"]
     invalid_mask = ~np.isin(submodel, supported_submodels)
 
-    # Check if there are any invalid submodels
     if np.any(invalid_mask):
         invalid_submodels = np.asarray(submodel)[invalid_mask]
         raise ValueError(
