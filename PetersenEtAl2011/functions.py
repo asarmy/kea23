@@ -35,10 +35,10 @@ def _calc_distrib_params_elliptical(*, magnitude, location):
 
     Parameters
     ----------
-    magnitude : float
+    magnitude : Union[float, np.ndarray]
         Earthquake moment magnitude.
 
-    location : float
+    location : Union[float, np.ndarray]
         Normalized location along rupture length, range [0, 1.0].
 
     Returns
@@ -67,10 +67,10 @@ def _calc_distrib_params_quadratic(*, magnitude, location):
 
     Parameters
     ----------
-    magnitude : float
+    magnitude : Union[float, np.ndarray]
         Earthquake moment magnitude.
 
-    location : float
+    location : Union[float, np.ndarray]
         Normalized location along rupture length, range [0, 1.0].
 
     Returns
@@ -100,10 +100,10 @@ def _calc_distrib_params_bilinear(*, magnitude, location):
 
     Parameters
     ----------
-    magnitude : float
+    magnitude : Union[float, np.ndarray]
         Earthquake moment magnitude.
 
-    location : float
+    location : Union[float, np.ndarray]
         Normalized location along rupture length, range [0, 1.0].
 
     Returns

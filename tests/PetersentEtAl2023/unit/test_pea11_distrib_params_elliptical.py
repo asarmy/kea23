@@ -25,35 +25,19 @@ RTOL = 2e-2
 
 
 @pytest.mark.parametrize("filename", [FILE])
-@pytest.mark.filterwarnings("ignore:Value")
 def test_calc(load_data_as_recarray):
-    # Loop over rows in CSV
-    for row in load_data_as_recarray:
-        # Set i/o
-        mag, loc = row["magnitude"], row["location"]
-        expected_mu, expected_sigma = row["mu"], row["sigma"]
+    # Define inputs and expected outputs
+    magnitudes = load_data_as_recarray["magnitude"]
+    locations = load_data_as_recarray["location"]
+    mu_expect = load_data_as_recarray["mu"]
+    sigma_expect = load_data_as_recarray["sigma"]
 
-        # Perform calculation
-        mu, sigma = FUNCTION(magnitude=np.asarray([mag]), location=np.asarray([loc]))
+    # Perform calculations
+    results = FUNCTION(magnitude=magnitudes, location=locations)
+    mu_calc, sigma_calc = results
 
-        # Check mu
-        np.testing.assert_allclose(
-            expected_mu,
-            mu,
-            rtol=RTOL,
-            err_msg=(
-                f"***For (magnitude, location) of {(mag, loc)}: "
-                f"Expected mu: {expected_mu}, Computed mu: {mu}***"
-            ),
-        )
-
-        # Check sigma
-        np.testing.assert_allclose(
-            expected_sigma,
-            sigma,
-            rtol=RTOL,
-            err_msg=(
-                f"***For (magnitude, location) of {(mag, loc)}: "
-                f"Expected sigma: {expected_sigma}, Computed sigma: {sigma}***"
-            ),
-        )
+    # Comparing exepcted and calculated
+    np.testing.assert_allclose(mu_expect, mu_calc, rtol=RTOL, err_msg="Discrepancy in mu values")
+    np.testing.assert_allclose(
+        sigma_expect, sigma_calc, rtol=RTOL, err_msg="Discrepancy in sigma values"
+    )
