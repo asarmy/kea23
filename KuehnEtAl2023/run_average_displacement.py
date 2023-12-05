@@ -25,22 +25,23 @@ from KuehnEtAl2023.run_displacement_profile import run_profile
 
 
 def run_ad(
-    *, magnitude: Union[float, int, List[Union[float, int]], np.ndarray], style: str
+    *,
+    magnitude: Union[float, int, List[Union[float, int]], np.ndarray],
+    style: Union[str, List[str], np.ndarray],
 ) -> pd.DataFrame:
     """
     Run KEA23 displacement model to calculate the average displacement that is implied by the model
     prediction. All parameters must be passed as keyword arguments. The mean model (i.e., mean
-    coefficients) is used. Only one style of faulting is allowed, but multiple magnitudes are
-    allowed.
+    coefficients) is used. Any number of scenarios (i.e., magnitudes, styles) are allowed.
 
     Parameters
     ----------
     magnitude : Union[float, list, numpy.ndarray]
         Earthquake moment magnitude.
 
-    style : str
+    style : Union[str, list, numpy.ndarray]
         Style of faulting (case-insensitive). Valid options are 'strike-slip', 'reverse', or
-        'normal'. Only one value allowed.
+        'normal'.
 
     Returns
     -------
@@ -56,13 +57,10 @@ def run_ad(
     ValueError
         If the provided `style` is not one of the supported styles.
 
-    TypeError
-        If more than one value is provided for `style`.
-
     Notes
     ------
     Command-line interface usage
-        Run (e.g.) `python run_average_displacement.py --magnitude 5 6 7 --style reverse`
+        Run (e.g.) `python run_average_displacement.py --magnitude 5 6 7 --style reverse normal`
         Run `python run_average_displacement.py --help`
 
     #TODO
@@ -77,27 +75,32 @@ def run_ad(
     # NOTE: `location_step=0.01` is used to create well-descritized profile for intergration
     results = run_profile(magnitude=magnitude, style=style, percentile=-1, location_step=0.01)
 
-    # Group by magnitude
-    grouped = results.groupby("magnitude")
+    # Group by magnitude and style
+    grouped = results.groupby(["magnitude", "model_number", "style"])
 
     # Calculate area under the mean slip profile; this is the Average Displacement (AD)
     # NOTE: use dictionary comprehension, it is probably slightly faster than apply lambda
-    areas = {name: np.trapz(group["displ_site"], group["location"]) for name, group in grouped}
+    areas = {
+        (mag, model, style): np.trapz(group["displ_site"], group["location"])
+        for (mag, model, style), group in grouped
+    }
 
     # Create output dataframe
-    n = len(areas)
+    magnitudes, model_numbers, styles, area_values = zip(
+        *[(mag, model, style, area) for (mag, model, style), area in areas.items()]
+    )
 
     values = (
-        list(areas.keys()),
-        np.full(n, style),
-        np.full(n, results["model_number"].iloc[0]),
-        list(areas.values()),
+        list(magnitudes),
+        list(model_numbers),
+        list(styles),
+        list(area_values),
     )
 
     type_dict = {
         "magnitude": float,
         "style": str,
-        "model_number": int,
+        "model_number": str,
         "avg_displ": float,
     }
     dataframe = pd.DataFrame(np.column_stack(values), columns=type_dict.keys())
@@ -107,8 +110,7 @@ def run_ad(
 
 
 def main():
-    description_text = """Run KEA23 displacement model to calculate the average displacement that is implied by the model
-    prediction. The mean model (i.e., mean coefficients) is used. Only one style of faulting is allowed, but multiple magnitudes and are allowed.
+    description_text = """Run KEA23 displacement model to calculate the average displacement that is implied by the model prediction. The mean model (i.e., mean coefficients) is used. Any number of scenarios (i.e., magnitudes, styles) are allowed.
 
     Returns
     -------
@@ -135,9 +137,10 @@ def main():
         "-s",
         "--style",
         required=True,
+        nargs="+",
         type=str.lower,
         choices=("strike-slip", "reverse", "normal"),
-        help="Style of faulting (case-sensitive). Only one value allowed.",
+        help="Style of faulting (case-sensitive).",
     )
 
     args = parser.parse_args()

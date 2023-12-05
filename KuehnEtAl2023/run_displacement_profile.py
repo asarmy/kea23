@@ -27,21 +27,21 @@ from KuehnEtAl2023.run_displacement_model import run_model
 def run_profile(
     *,
     magnitude: Union[float, int, List[Union[float, int]], np.ndarray],
-    style: str,
+    style: Union[str, List[str], np.ndarray],
     percentile: Union[float, int, List[Union[float, int]], np.ndarray],
     location_step: float = 0.05,
 ) -> pd.DataFrame:
     """
     Run KEA23 displacement model to create slip profile. All parameters must be passed as keyword
-    arguments. The mean model (i.e., mean coefficients) is used. Only one style of faulting is
-    allowed, but multiple magnitudes and percentiles are allowed.
+    arguments. The mean model (i.e., mean coefficients) is used. Any number of scenarios (i.e.,
+    magnitudes, styles, percentiles) are allowed.
 
     Parameters
     ----------
     magnitude : Union[float, list, numpy.ndarray]
         Earthquake moment magnitude.
 
-    style : str
+    style : Union[str, list, numpy.ndarray]
         Style of faulting (case-insensitive). Valid options are 'strike-slip', 'reverse', or
         'normal'.
 
@@ -77,9 +77,6 @@ def run_profile(
     ValueError
         If the provided `style` is not one of the supported styles.
 
-    TypeError
-        If more than one value is provided for `style`.
-
     Notes
     ------
     Command-line interface usage
@@ -106,11 +103,11 @@ def run_profile(
         mean_model=True,
     )
 
-    return dataframe.sort_values(by=["magnitude", "percentile", "location"])
+    return dataframe.sort_values(by=["magnitude", "style", "percentile", "location"])
 
 
 def main():
-    description_text = """Run KEA23 displacement model to create slip profile. The mean model (i.e., mean coefficients) is used. Only one style of faulting is allowed, but multiple magnitudes and percentiles are allowed.
+    description_text = """Run KEA23 displacement model to create slip profile. The mean model (i.e., mean coefficients) is used.Any number of scenarios (i.e., magnitudes, styles, percentiles) are allowed.
 
     Returns
     -------
@@ -150,9 +147,10 @@ def main():
         "-s",
         "--style",
         required=True,
+        nargs="+",
         type=str.lower,
         choices=("strike-slip", "reverse", "normal"),
-        help="Style of faulting (case-sensitive). Only one value allowed.",
+        help="Style of faulting (case-sensitive).",
     )
     parser.add_argument(
         "-p",

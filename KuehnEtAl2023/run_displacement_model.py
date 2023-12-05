@@ -3,9 +3,8 @@
 - Results for the location, its complement, and folded location are always returned.
 - The mean model (i.e., mean coefficients) is run by default, but results for all coefficients can be computed.
 - If full model is run (i.e., `mean_model=False`), then only one scenario is allowed.
-- A scenario is defined as a magnitude-location-percentile combination.
+- A scenario is defined as a magnitude-location-style-percentile combination.
 - If mean model is run (i.e., `mean_model=True` or default), then any number of scenarios is allowed.
-- Only one style of faulting is allowed regardless of whether mean or full coefficients are used.
 - Command-line use is supported; try `python run_displacement_model.py --help`
 - Module use is supported; try `from run_displacement_model import run_model`
 
@@ -30,35 +29,97 @@ from KuehnEtAl2023.data import POSTERIOR, POSTERIOR_MEAN
 from KuehnEtAl2023.functions import func_nm, func_rv, func_ss
 
 
-def _calculate_distribution_parameters(*, magnitude, location, style, coefficients):
+def _calculate_distribution_parameters(*, magnitude, location, style, mean_model):
     """
-    Helper function to calculate predicted mean and standard deviation in transformed units.
+    A vectorized helper function to calculate predicted mean and standard deviation in transformed
+    units and the Box-Cox transformation parameter.
 
     Parameters
     ----------
-    coefficients : Union[np.recarray, pd.DataFrame]
-        A numpy recarray or a pandas DataFrame containing model coefficients.
-
-    magnitude : float
+    magnitude : np.array
         Earthquake moment magnitude.
 
-    location : float
+    location : np.array
         Normalized location along rupture length, range [0, 1.0].
+
+    style : np.array
+        Style of faulting (case-insensitive). Valid options are 'strike-slip', 'reverse', or
+        'normal'.
+
+    mean_model : bool
+        If True, use mean coefficients. If False, use full coefficients.
 
     Returns
     -------
-    Tuple[np.array, np.array]
+    Tuple[np.array, np.array, np.array, np.array]
         mu : Mean prediction in transformed units.
         sigma : Total standard deviation in transformed units.
+        lam : Box-Cox transformation parameter.
+        model_num : Model coefficient row number. Returns -1 for mean model.
     """
 
-    function_map = {"strike-slip": func_ss, "reverse": func_rv, "normal": func_nm}
+    if mean_model:
+        # Calculate for all submodels
+        # NOTE: it is actually faster to just do this instead of if/else, loops, etc.
 
-    # NOTE: Check for appropriate style is handled in `run_model`
-    model = function_map[style]
-    mu, sigma = model(coefficients, magnitude, location)
+        # Define coefficients (loaded with module imports)
+        # NOTE: Coefficients are pandas dataframes; convert here to recarray for faster computations
+        # NOTE: Check for appropriate style is handled in `run_model`
+        mean_coeffs_ss = POSTERIOR_MEAN.get("strike-slip").to_records(index=False)
+        mean_coeffs_rv = POSTERIOR_MEAN.get("reverse").to_records(index=False)
+        mean_coeffs_nm = POSTERIOR_MEAN.get("normal").to_records(index=False)
 
-    return mu, sigma
+        result_ss = func_ss(mean_coeffs_ss, magnitude, location)
+        result_rv = func_rv(mean_coeffs_rv, magnitude, location)
+        result_nm = func_nm(mean_coeffs_nm, magnitude, location)
+
+        lam_ss = mean_coeffs_ss["lambda"]
+        lam_rv = mean_coeffs_rv["lambda"]
+        lam_nm = mean_coeffs_nm["lambda"]
+
+        model_num_ss = mean_coeffs_ss["model_number"]
+        model_num_rv = mean_coeffs_rv["model_number"]
+        model_num_nm = mean_coeffs_nm["model_number"]
+
+        # Conditions for np.select
+        conditions = [
+            style == "strike-slip",
+            style == "reverse",
+            style == "normal",
+        ]
+
+        # Choices for mu and sigma
+        choices_mu = [result_ss[0], result_rv[0], result_nm[0]]
+        choices_sigma = [result_ss[1], result_rv[1], result_nm[1]]
+        choices_lam = [lam_ss, lam_rv, lam_nm]
+        choices_model_num = [model_num_ss, model_num_rv, model_num_nm]
+
+        # Use np.select to get the final mu, sigma, and lambda
+        mu = np.select(conditions, choices_mu, default=np.nan)
+        sigma = np.select(conditions, choices_sigma, default=np.nan)
+        lam = np.select(conditions, choices_lam, default=np.nan)
+        model_num = np.select(conditions, choices_model_num, default=np.nan)
+
+        return mu, sigma, lam, model_num
+
+    else:
+
+        # NOTE: Check for appropriate style is handled in `run_model`
+        function_map = {"strike-slip": func_ss, "reverse": func_rv, "normal": func_nm}
+
+        # NOTE: use instead of style[0] as another way to check only one style in list; #TODO make this a try/except?
+        s = "".join(style)
+        model = function_map[s]
+
+        # Define coefficients (loaded with module imports)
+        # NOTE: Coefficients are pandas dataframes; convert here to recarray for faster computations
+        coeffs = POSTERIOR.get(s).to_records(index=False)
+
+        mu, sigma = model(coeffs, magnitude, location)
+        lam = coeffs["lambda"]
+        model_num = coeffs["model_number"]
+
+        return mu, sigma, lam, model_num
 
 
 def _calculate_Y(*, mu, sigma, lam, percentile):
@@ -134,17 +195,16 @@ def run_model(
     *,
     magnitude: Union[float, int, List[Union[float, int]], np.ndarray],
     location: Union[float, int, List[Union[float, int]], np.ndarray],
-    style: str,
-    percentile: Union[float, int, List[Union[float, int]], np.ndarray],
+    style: Union[str, List[str], np.ndarray],
+    percentile: Union[str, List[str], np.ndarray],
     mean_model: bool = True,
 ) -> pd.DataFrame:
     """
     Run KEA23 displacement model. All parameters must be passed as keyword arguments.
     A couple "gotchas":
-        Only one style of faulting is allowed.
         If full model is run (i.e., `mean_model=False`), then only one scenario is allowed.
         If mean model is run (i.e., `mean_model=True` or default), then any number of scenarios is allowed.
-        A scenario is defined as a magnitude-location-percentile combination.
+        A scenario is defined as a magnitude-location-style-percentile combination.
 
     Parameters
     ----------
@@ -154,12 +214,12 @@ def run_model(
     location : Union[float, list, numpy.ndarray]
         Normalized location along rupture length, range [0, 1.0].
 
-    style : str
+    style : Union[str, list, numpy.ndarray]
         Style of faulting (case-insensitive). Valid options are 'strike-slip', 'reverse', or
-        'normal'. Only one value allowed.
+        'normal'.
 
     percentile : Union[float, list, numpy.ndarray]
-        Aleatory quantile value. Use -1 for mean. Only one value allowed.
+        Aleatory quantile value. Use -1 for mean.
 
     mean_model : bool, optional
         If True, use mean coefficients. If False, use full coefficients. Default True.
@@ -191,8 +251,7 @@ def run_model(
         If the provided `style` is not one of the supported styles.
 
     TypeError
-        If more than one value is provided for `style`.
-        If more than one value is provided for `magnitude`, `location`, or `percentile` when `mean_model=False`.
+        If more than one value is provided for `magnitude`, `location`, `style`, or `percentile` when `mean_model=False`.
 
     Notes
     ------
@@ -207,26 +266,16 @@ def run_model(
     Raise a UserWarning for magntiudes outside recommended ranges.
     """
 
-    # Only one style allowed
-    # TODO: allow more than one style? need to refactor `functions.py`?
-    if not isinstance(style, (str)):
-        raise TypeError(
-            f"Expected a string, got '{style}', which is a {type(style).__name__}."
-            f"(In other words, only one value is allowed; check you have not entered a list or array.)"
-        )
+    # Check if there are any invalid styles
+    style = [x.lower() for x in ([style] if isinstance(style, str) else style)]
+    supported_styles = list(POSTERIOR.keys())
+    invalid_mask = ~np.isin(style, supported_styles)
 
-    # Check for allowable styles
-    style = style.lower()
-    if style not in POSTERIOR:
+    if np.any(invalid_mask):
+        invalid_styles = np.asarray(style)[invalid_mask]
         raise ValueError(
-            f"Unsupported style '{style}'. Supported styles are 'strike-slip', 'reverse', and 'normal' (case-insensitive)."
+            f"Unsupported style: {invalid_styles}. Supported styles are {supported_styles} (case-insensitive)."
         )
-
-    # Define coefficients (loaded with module imports)
-    if mean_model:
-        coeffs = POSTERIOR_MEAN.get(style)
-    else:
-        coeffs = POSTERIOR.get(style)
 
     # If full model, only one scenario is allowed
     # TODO: allow more than one scenario? need to refactor `functions.py`?
@@ -235,6 +284,7 @@ def run_model(
             "magnitude": magnitude,
             "location": location,
             "percentile": percentile,
+            "style": style,
         }
         for key, value in scenario_dict.items():
             if isinstance(value, list) or isinstance(value, np.ndarray):
@@ -243,30 +293,27 @@ def run_model(
                         f"Only one value is allowed for '{key}' when `mean_model=False`, but user entered '{value}', which is {len(value)} values."
                     )
 
-    # NOTE: Coefficients are pandas dataframes; convert here to recarray for faster computations
-    coeffs = coeffs.to_records(index=False)
-
     # Vectorize scenarios
     scenarios = product(
         [magnitude] if not isinstance(magnitude, (list, np.ndarray)) else magnitude,
         [location] if not isinstance(location, (list, np.ndarray)) else location,
         [percentile] if not isinstance(percentile, (list, np.ndarray)) else percentile,
+        [style] if not isinstance(style, (list, np.ndarray)) else style,
     )
-    magnitude, location, percentile = map(np.array, zip(*scenarios))
+    magnitude, location, percentile, style = map(np.array, zip(*scenarios))
 
     # Get distribution parameters for site and complement
-    mu_site, sigma_site = _calculate_distribution_parameters(
-        magnitude=magnitude, location=location, style=style, coefficients=coeffs
+    mu_site, sigma_site, lam, model_number = _calculate_distribution_parameters(
+        magnitude=magnitude, location=location, style=style, mean_model=mean_model
     )
-    mu_complement, sigma_complement = _calculate_distribution_parameters(
+    mu_complement, sigma_complement, _, _ = _calculate_distribution_parameters(
         magnitude=magnitude,
         location=1 - location,
         style=style,
-        coefficients=coeffs,
+        mean_model=mean_model,
     )
 
     # Calculate Y (transformed displacement)
-    lam = coeffs["lambda"]
     Y_site = _calculate_Y(mu=mu_site, sigma=sigma_site, lam=lam, percentile=percentile)
     Y_complement = _calculate_Y(
         mu=mu_complement, sigma=sigma_complement, lam=lam, percentile=percentile
@@ -280,14 +327,14 @@ def run_model(
 
     # Create a DataFrame
     # NOTE: number of rows will be controlled by number of scenarios (if mean model) or number of coefficients (if full model)
-    n = max(len(magnitude), len(coeffs))
+    n = max(len(magnitude), len(mu_site))
     results = (
         np.full(n, magnitude),
         np.full(n, location),
         np.full(n, style),
         np.full(n, percentile),
-        np.full(n, coeffs["model_number"]),
-        np.full(n, lam),
+        [int(x) for x in model_number],
+        lam,
         mu_site,
         sigma_site,
         mu_complement,
@@ -326,10 +373,9 @@ def run_model(
 
 def main():
     description_text = """Run KEA23 displacement model. A couple "gotchas":
-        Only one style of faulting is allowed.
         If full model is run (i.e., `--no-mean_model`), then only one scenario is allowed.
         If mean model is run (i.e., `--mean_model` or default), then any number of scnearios is allowed.
-        A scenario is defined as a magnitude-location-percentile combination.
+        A scenario is defined as a magnitude-location-style-percentile combination.
 
     Returns
     -------
@@ -376,9 +422,10 @@ def main():
         "-s",
         "--style",
         required=True,
+        nargs="+",
         type=str.lower,
         choices=("strike-slip", "reverse", "normal"),
-        help="Style of faulting (case-insensitive). Only one value allowed.",
+        help="Style of faulting (case-insensitive).",
     )
     parser.add_argument(
         "-p",
