@@ -16,7 +16,7 @@ from MossRoss2011.functions import _calc_distrib_params_mag_md
 # Test setup
 FUNCTION = _calc_distrib_params_mag_md
 FILE = "moss_ross_params_mag_md.csv"
-RTOL = 2e-2
+RTOL = 1e-2
 
 
 @pytest.mark.parametrize("filename", [FILE])

@@ -16,7 +16,7 @@ from WellsCoppersmith1994 import functions as wc94
 # Test setup
 FUNCTION = wc94._calc_distrib_params_mag_ad
 FILE = "wells_coppersmith_params_mag_ad.csv"
-RTOL = 2e-2
+RTOL = 1e-2
 
 
 @pytest.mark.parametrize("filename", [FILE])

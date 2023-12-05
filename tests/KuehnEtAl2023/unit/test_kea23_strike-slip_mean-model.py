@@ -21,7 +21,7 @@ from KuehnEtAl2023.functions import (
 )
 
 # Test setup
-RTOL = 2e-2
+RTOL = 1e-2
 STYLE = "strike-slip"
 FILE = "strike-slip_mean-model.csv"
 

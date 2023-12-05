@@ -14,7 +14,7 @@ sys.path.append(str(PROJ_DIR))
 from PetersenEtAl2011.run_displacement_model import run_model
 
 # Test setup
-RTOL = 2e-2
+RTOL = 1e-2
 
 # Add path for expected outputs
 SCRIPT_DIR = Path(__file__).resolve().parent

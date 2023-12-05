@@ -20,7 +20,7 @@ from KuehnEtAl2023.functions import (
 )
 
 # Test setup
-RTOL = 2e-2
+RTOL = 1e-2
 STYLE = "reverse"
 FILE = "reverse_mean-model.csv"
 

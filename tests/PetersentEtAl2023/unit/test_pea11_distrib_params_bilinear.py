@@ -21,7 +21,7 @@ from PetersenEtAl2011 import functions as pea11
 # Test setup
 FUNCTION = pea11._calc_distrib_params_bilinear
 FILE = "petersen_et_al_2011_bilinear_params.csv"
-RTOL = 2e-2
+RTOL = 1e-2
 
 
 @pytest.mark.parametrize("filename", [FILE])
