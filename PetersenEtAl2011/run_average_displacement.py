@@ -95,7 +95,7 @@ def run_ad(
         location_step=0.01,
     )
 
-    # Group by both magnitude and submodel shape
+    # Group by magnitude and submodel shape
     grouped = results.groupby(["magnitude", "model_name", "style"])
 
     # Calculate area under the mean slip profile; this is the Average Displacement (AD)

@@ -76,7 +76,7 @@ def _calc_distrib_params(*, magnitude, style):
 def run_md(
     *,
     magnitude: Union[float, int, List[Union[float, int]], np.ndarray],
-    percentile: Union[float, int, List[Union[float, int]], np.ndarray],
+    percentile: Union[float, int, List[Union[float, int]], np.ndarray] = 0.5,
     style: str = "all",
 ) -> pd.DataFrame:
     """
