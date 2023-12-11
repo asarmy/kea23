@@ -1,3 +1,8 @@
+"""This file contains tests for the internal functions used to calculate aggregated fault
+displacement using the Kuehn et al. (2023) model. The results were computed by Alex Sarmiento and
+checked by Dr. Nico Kuehn in November 2023.
+"""
+
 # Python imports
 import sys
 from pathlib import Path
@@ -40,47 +45,33 @@ def test_reverse_mean_model(results_data):
     coeffs = POSTERIOR_MEAN.get(STYLE)
     for row in results_data:
         # Inputs
-        magnitude = row[0]
-        location = row[1]
+        magnitude, location = row[:2]
 
-        # Expected
-        mode_expect = row[2]
-        mu_expect = row[3]
-        sd_mode_expect = row[4]
-        sd_u_expect = row[5]
-        median_expect = mu_expect
-        sd_tot_expect = row[6]
+        # Expected values
+        expected_values = {
+            "mode": row[2],
+            "mu": row[3],
+            "sd_mode": row[4],
+            "sd_u": row[5],
+            "median": row[3],  # Same as mu_expect
+            "sd_tot": row[6],
+        }
 
-        # Computed
-        mode_calc = func_mode(coeffs, magnitude)
-        mu_calc = func_mu(coeffs, magnitude, location)
-        sd_mode_calc = coeffs["s_m,r"]
-        sd_u_calc = func_sd_u(coeffs, location)
-        median_calc, sd_tot_calc = func_rv(coeffs, magnitude, location)
+        # Computed values
+        computed_values = {
+            "mode": func_mode(coeffs, magnitude),
+            "mu": func_mu(coeffs, magnitude, location),
+            "sd_mode": coeffs["s_m,r"],
+            "sd_u": func_sd_u(coeffs, location),
+        }
+        computed_values["median"], computed_values["sd_tot"] = func_rv(coeffs, magnitude, location)
 
         # Tests
-        func_names = ["mode", "mu", "sd_mode", "sd_u", "func_rv (med)", "func_rv (sd)"]
-        expected_values = [
-            mode_expect,
-            mu_expect,
-            sd_mode_expect,
-            sd_u_expect,
-            median_expect,
-            sd_tot_expect,
-        ]
-        computed_values = [
-            mode_calc,
-            mu_calc,
-            sd_mode_calc,
-            sd_u_calc,
-            median_calc,
-            sd_tot_calc,
-        ]
-
-        for (func_name, expected, computed) in zip(func_names, expected_values, computed_values):
+        for key, expected in expected_values.items():
+            computed = computed_values[key]
             np.testing.assert_allclose(
                 expected,
                 computed,
                 rtol=RTOL,
-                err_msg=f"Mag {magnitude}, u-star {location}, {func_name}, Expected: {expected}, Computed: {computed}",
+                err_msg=f"Mag {magnitude}, u-star {location}, {key}, Expected: {expected}, Computed: {computed}",
             )

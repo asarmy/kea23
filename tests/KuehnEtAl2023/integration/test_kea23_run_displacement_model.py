@@ -1,3 +1,8 @@
+"""This file contains tests for the user functions used to calculate aggregated fault displacement
+using the Kuehn et al. (2023) model. The results were computed by Alex Sarmiento and checked by Dr.
+Nico Kuehn in November 2023.
+"""
+
 # Python imports
 import sys
 from pathlib import Path
@@ -33,71 +38,36 @@ def results_data():
 def test_run_model(results_data):
     for row in results_data:
         # Inputs
-        magnitude = row[0]
-        location = row[1]
-        percentile = row[2]
-        style = row[3]
+        magnitude, location, percentile, style, *expected_outputs = row
 
-        # Expected
-        mu_loc_expect = row[4]
-        sd_loc_expect = row[5]
-        mu_compl_expect = row[6]
-        sd_compl_expect = row[7]
-        Y_site_expect = row[8]
-        Y_compl_expect = row[9]
-        Y_folded_expect = row[10]
-        displ_site_expect = row[11]
-        displ_compl_expect = row[12]
-        displ_folded_expect = row[13]
+        # Expected values
+        expected_keys = [
+            "mu_site",
+            "sigma_site",
+            "mu_complement",
+            "sigma_complement",
+            "Y_site",
+            "Y_complement",
+            "Y_folded",
+            "displ_site",
+            "displ_complement",
+            "displ_folded",
+        ]
+        expected_values = dict(zip(expected_keys, expected_outputs))
 
-        # Computed
+        # Computed values
         results = run_model(
             magnitude=magnitude,
             location=location,
             style=style,
             percentile=percentile,
         )
-        mu_loc_calc = results["mu_site"]
-        sd_loc_calc = results["sigma_site"]
-        mu_compl_calc = results["mu_complement"]
-        sd_compl_calc = results["sigma_complement"]
-        Y_site_calc = results["Y_site"]
-        Y_compl_calc = results["Y_complement"]
-        Y_folded_calc = results["Y_folded"]
-        displ_site_calc = results["displ_site"]
-        displ_compl_calc = results["displ_complement"]
-        displ_folded_calc = results["displ_folded"]
 
-        # Tests
-        expected_values = [
-            mu_loc_expect,
-            sd_loc_expect,
-            mu_compl_expect,
-            sd_compl_expect,
-            Y_site_expect,
-            Y_compl_expect,
-            Y_folded_expect,
-            displ_site_expect,
-            displ_compl_expect,
-            displ_folded_expect,
-        ]
-        computed_values = [
-            mu_loc_calc,
-            sd_loc_calc,
-            mu_compl_calc,
-            sd_compl_calc,
-            Y_site_calc,
-            Y_compl_calc,
-            Y_folded_calc,
-            displ_site_calc,
-            displ_compl_calc,
-            displ_folded_calc,
-        ]
-
-        for (expected, computed) in zip(expected_values, computed_values):
+        # Testing
+        for key in expected_keys:
             np.testing.assert_allclose(
-                expected,
-                computed,
+                expected_values[key],
+                results[key],
                 rtol=RTOL,
-                err_msg=f"Mag {magnitude}, u-star {location}, style {style}, percentile {percentile}, Expected: {expected}, Computed: {computed}",
+                err_msg=f"Mag {magnitude}, u-star {location}, style {style}, percentile {percentile}, Expected: {expected_values[key]}, Computed: {results[key]}",
             )
