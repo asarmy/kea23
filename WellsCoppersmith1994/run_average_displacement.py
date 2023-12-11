@@ -9,6 +9,7 @@ Reference: https://doi.org/10.1785/BSSA0840040974
 
 # Python imports
 import argparse
+import sys
 import warnings
 from pathlib import Path
 
@@ -18,8 +19,14 @@ from itertools import product
 from scipy import stats
 from typing import Union, List
 
+# Add path for project
+# FIXME: shouldn't need to do this!
+PROJ_DIR = Path(__file__).resolve().parents[1]
+sys.path.append(str(PROJ_DIR))
+del PROJ_DIR
+
 # Module imports
-import model_config  # noqa: F401
+import WellsCoppersmith1994.model_config as model_config  # noqa: F401
 from WellsCoppersmith1994.functions import _calc_distrib_params_mag_ad
 
 

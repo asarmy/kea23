@@ -1,14 +1,9 @@
-import sys
-from pathlib import Path
-
-# Add path for project
-# FIXME: shouldn't need to do this!
-PROJ_DIR = Path(__file__).resolve().parents[1]
-sys.path.append(str(PROJ_DIR))
-del PROJ_DIR
-
 # Import project configurations
 import project_config  # noqa: F401
+
+# Import numpy seed and number of samples from project settings
+N_SAMPLES = project_config.N_SAMPLES
+NP_SEED = project_config.NP_SEED
 
 # Recommended magnitude / allowable styles
 MAG_RANGE = {"reverse": (5.5, 8.0)}

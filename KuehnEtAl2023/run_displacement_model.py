@@ -15,6 +15,7 @@ Reference: https://doi.org/10.1177/ToBeAssigned
 
 # Python imports
 import argparse
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -23,8 +24,14 @@ from itertools import product
 from scipy import stats
 from typing import Union, List
 
+# Add path for project
+# FIXME: shouldn't need to do this!
+PROJ_DIR = Path(__file__).resolve().parents[1]
+sys.path.append(str(PROJ_DIR))
+del PROJ_DIR
+
 # Module imports
-import model_config  # noqa: F401
+import KuehnEtAl2023.model_config as model_config  # noqa: F401
 from KuehnEtAl2023.data import POSTERIOR, POSTERIOR_MEAN
 from KuehnEtAl2023.functions import func_nm, func_rv, func_ss
 

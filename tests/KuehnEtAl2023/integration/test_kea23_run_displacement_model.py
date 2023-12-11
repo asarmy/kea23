@@ -10,14 +10,15 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+
 # Add path for module
 # FIXME: shouldn't need this with a package install (`__init__` should suffice?!)
-MODEL_DIR = Path(__file__).resolve().parents[3] / "KuehnEtAl2023"
-sys.path.append(str(MODEL_DIR))
-
+PROJ_DIR = Path(__file__).resolve().parents[3]
+sys.path.append(str(PROJ_DIR))
 
 # Module imports
-from run_displacement_model import run_model
+from KuehnEtAl2023.run_displacement_model import run_model
+
 
 # Test setup
 RTOL = 1e-2
