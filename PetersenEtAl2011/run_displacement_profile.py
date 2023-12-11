@@ -33,8 +33,8 @@ def run_profile(
     *,
     magnitude: Union[float, int, List[Union[float, int]], np.ndarray],
     percentile: Union[float, int, List[Union[float, int]], np.ndarray],
-    submodel: str = "elliptical",
-    style: str = "strike-slip",
+    submodel: Union[str, List[str], np.ndarray] = "elliptical",
+    style: Union[str, List[str], np.ndarray] = "strike-slip",
     location_step: float = 0.05,
 ) -> pd.DataFrame:
     """
@@ -51,8 +51,8 @@ def run_profile(
         Aleatory quantile value. Use -1 for mean.
 
     submodel : Union[str, list, numpy.ndarray], optional
-        PEA11 shape model name  (case-insensitive). Default is 'elliptical'. Valid options are 'elliptical',
-        'quadratic', or 'bilinear'.
+        PEA11 shape model name  (case-insensitive). Default is "elliptical". Valid options are
+        "elliptical", "quadratic", or "bilinear".
 
     style : Union[str, list, numpy.ndarray], optional
         Style of faulting (case-insensitive). Default is "strike-slip".
@@ -81,7 +81,7 @@ def run_profile(
     Warns  (inherited from `run_displacement_model.py`)
     -----
     UserWarning
-        If an unsupported `style` is provided. The user input will be over-ridden with 'strike-slip'.
+        If an unsupported `style` is provided. The user input will be over-ridden with "strike-slip".
 
     Notes
     ------
@@ -109,7 +109,9 @@ def run_profile(
         style=style,
     )
 
-    return dataframe.sort_values(by=["magnitude", "model_name", "percentile", "location"])
+    return dataframe.sort_values(
+        by=["magnitude", "model_name", "percentile", "location"]
+    ).reset_index(drop=True)
 
 
 def main():

@@ -103,7 +103,9 @@ def run_profile(
         mean_model=True,
     )
 
-    return dataframe.sort_values(by=["magnitude", "style", "percentile", "location"])
+    return dataframe.sort_values(by=["magnitude", "style", "percentile", "location"]).reset_index(
+        drop=True
+    )
 
 
 def main():

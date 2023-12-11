@@ -19,8 +19,8 @@ def _calc_distrib_params_mag_ad(*, magnitude, style="all"):
         Earthquake moment magnitude.
 
     style : str, optional
-        Style of faulting (case-insensitive). Default is 'all'. Valid options are 'strike-slip',
-        'reverse', 'normal', or 'all'.
+        Style of faulting (case-insensitive). Default is "all". Valid options are "strike-slip",
+        "reverse", "normal", or "all".
 
     Returns
     -------
@@ -58,8 +58,8 @@ def _calc_distrib_params_mag_md(*, magnitude, style="all"):
         Earthquake moment magnitude.
 
     style : str, optional
-        Style of faulting (case-insensitive). Default is 'all'. Valid options are 'strike-slip',
-        'reverse', 'normal', or 'all'.
+        Style of faulting (case-insensitive). Default is "all". Valid options are "strike-slip",
+        "reverse", "normal", or "all".
 
     Returns
     -------

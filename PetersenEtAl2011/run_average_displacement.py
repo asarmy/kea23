@@ -31,8 +31,8 @@ from PetersenEtAl2011.run_displacement_profile import run_profile
 def run_ad(
     *,
     magnitude: Union[float, int, List[Union[float, int]], np.ndarray],
-    submodel: str = "elliptical",
-    style: str = "strike-slip",
+    submodel: Union[str, List[str], np.ndarray] = "elliptical",
+    style: Union[str, List[str], np.ndarray] = "strike-slip",
 ) -> pd.DataFrame:
     """
     Run PEA11 principal fault displacement model to calculate the average displacement that is
@@ -45,8 +45,8 @@ def run_ad(
         Earthquake moment magnitude.
 
     submodel : Union[str, list, numpy.ndarray], optional
-        PEA11 shape model name  (case-insensitive). Default is 'elliptical'. Valid options are 'elliptical',
-        'quadratic', or 'bilinear'.
+        PEA11 shape model name  (case-insensitive). Default is "elliptical". Valid options are
+        "elliptical", "quadratic", or "bilinear".
 
 
     style : Union[str, list, numpy.ndarray], optional
@@ -69,7 +69,7 @@ def run_ad(
     Warns  (inherited from `run_displacement_model.py`)
     -----
     UserWarning
-        If an unsupported `style` is provided. The user input will be over-ridden with 'strike-slip'.
+        If an unsupported `style` is provided. The user input will be over-ridden with "strike-slip".
 
     Notes
     ------

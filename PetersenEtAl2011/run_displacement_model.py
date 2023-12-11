@@ -36,18 +36,18 @@ def _calc_distrib_params(*, magnitude, location, submodel):
 
     Parameters
     ----------
-    magnitude : float
+    magnitude : numpy.ndarray
         Earthquake moment magnitude.
 
-    location : float
+    location : numpy.ndarray
         Normalized location along rupture length, range [0, 1.0].
 
     submodel : str
-        PEA11 shape model name. Valid options are 'elliptical', 'quadratic', or 'bilinear'.
+        PEA11 shape model name. Valid options are "elliptical", "quadratic", or "bilinear".
 
     Returns
     -------
-    Tuple[float, float]
+    Tuple[numpy.ndarray, numpy.ndarray]
         mu : Mean prediction.
         sigma : Total standard deviation.
 
@@ -85,8 +85,8 @@ def run_model(
     magnitude: Union[float, int, List[Union[float, int]], np.ndarray],
     location: Union[float, int, List[Union[float, int]], np.ndarray],
     percentile: Union[float, int, List[Union[float, int]], np.ndarray],
-    submodel: str = "elliptical",
-    style: str = "strike-slip",
+    submodel: Union[str, List[str], np.ndarray] = "elliptical",
+    style: Union[str, List[str], np.ndarray] = "strike-slip",
 ) -> pd.DataFrame:
     """
     Run PEA11 principal fault displacement model. All parameters must be passed as keyword
@@ -104,8 +104,8 @@ def run_model(
         Aleatory quantile value. Use -1 for mean.
 
     submodel : Union[str, list, numpy.ndarray], optional
-        PEA11 shape model name (case-insensitive). Default is 'elliptical'. Valid options are 'elliptical',
-        'quadratic', or 'bilinear'.
+        PEA11 shape model name (case-insensitive). Default is "elliptical". Valid options are
+        "elliptical", "quadratic", or "bilinear".
 
     style : Union[str, list, numpy.ndarray], optional
         Style of faulting (case-insensitive). Default is "strike-slip".
@@ -131,7 +131,7 @@ def run_model(
     Warns
     -----
     UserWarning
-        If an unsupported `style` is provided. The user input will be over-ridden with 'strike-slip'.
+        If an unsupported `style` is provided. The user input will be over-ridden with "strike-slip".
 
     Notes
     ------

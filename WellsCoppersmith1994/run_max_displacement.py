@@ -33,8 +33,8 @@ def _calc_distrib_params(*, magnitude, style):
         Earthquake moment magnitude.
 
     style : str, optional
-        Style of faulting (case-insensitive). Default is 'all'. Valid options are 'strike-slip',
-        'reverse', 'normal', or 'all'.
+        Style of faulting (case-insensitive). Default is "all". Valid options are "strike-slip",
+        "reverse", "normal", or "all".
 
     Returns
     -------
@@ -77,7 +77,7 @@ def run_md(
     *,
     magnitude: Union[float, int, List[Union[float, int]], np.ndarray],
     percentile: Union[float, int, List[Union[float, int]], np.ndarray] = 0.5,
-    style: str = "all",
+    style: Union[str, List[str], np.ndarray] = "all",
 ) -> pd.DataFrame:
     """
     Run WC94 model to calculate the maximum displacement as a function of magnitude. All parameters
@@ -93,8 +93,8 @@ def run_md(
         Aleatory quantile value. Default is 0.5. Use -1 for mean.
 
     style : Union[str, list, numpy.ndarray], optional
-        Style of faulting (case-insensitive). Default is 'all'. Valid options are 'strike-slip',
-        'reverse', 'normal', or 'all'.
+        Style of faulting (case-insensitive). Default is "all". Valid options are "strike-slip",
+        "reverse", "normal", or "all".
 
     Returns
     -------
