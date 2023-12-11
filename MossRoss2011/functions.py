@@ -27,6 +27,8 @@ def _calc_distrib_params_mag_ad(*, magnitude):
     Mu and sigma are in log10 units
     """
 
+    magnitude = np.atleast_1d(magnitude)
+
     a, b, sigma = -2.2192, 0.3244, 0.17
     mu = a + b * magnitude
 
@@ -52,6 +54,7 @@ def _calc_distrib_params_mag_md(*, magnitude):
     ------
     Mu and sigma are in log10 units
     """
+    magnitude = np.atleast_1d(magnitude)
 
     a, b, sigma = -3.1971, 0.5102, 0.31
     mu = a + b * magnitude
@@ -75,6 +78,8 @@ def _calc_distrib_params_d_ad(*, location):
         beta : Scale parameter for Gamma distribution.
 
     """
+
+    location = np.atleast_1d(location)
 
     folded_location = np.minimum(location, 1 - location)
 
@@ -105,6 +110,8 @@ def _calc_distrib_params_d_md(*, location):
         beta : Shape parameter for Beta distribution.
 
     """
+
+    location = np.atleast_1d(location)
 
     folded_location = np.minimum(location, 1 - location)
 

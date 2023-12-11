@@ -33,6 +33,7 @@ def _calc_distrib_params_mag_ad(*, magnitude, style="all"):
     Mu and sigma are in log10 units
     """
 
+    magnitude = np.atleast_1d(magnitude)
     style = style.lower()
 
     coeffs = {
@@ -72,6 +73,7 @@ def _calc_distrib_params_mag_md(*, magnitude, style="all"):
     Mu and sigma are in log10 units
     """
 
+    magnitude = np.atleast_1d(magnitude)
     style = style.lower()
 
     coeffs = {

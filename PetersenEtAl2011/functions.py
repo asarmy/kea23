@@ -52,6 +52,9 @@ def _calc_distrib_params_elliptical(*, magnitude, location):
     Mu and sigma are in natural log units. Exp(mu) is in centimeters, not meters.
     """
 
+    # Convert inputs to list-like numpy arrays
+    magnitude, location = map(np.atleast_1d, (magnitude, location))
+
     a, b, c = 1.7927, 3.3041, -11.2192
     sigma = 1.1348
 
@@ -83,6 +86,9 @@ def _calc_distrib_params_quadratic(*, magnitude, location):
     ------
     Mu and sigma are in natural log units. Exp(mu) is in centimeters, not meters.
     """
+
+    # Convert inputs to list-like numpy arrays
+    magnitude, location = map(np.atleast_1d, (magnitude, location))
 
     folded_location = np.minimum(location, 1 - location)
 
@@ -116,6 +122,9 @@ def _calc_distrib_params_bilinear(*, magnitude, location):
     ------
     Mu and sigma are in natural log units. Exp(mu) is in centimeters, not meters.
     """
+
+    # Convert inputs to list-like numpy arrays
+    magnitude, location = map(np.atleast_1d, (magnitude, location))
 
     folded_location = np.minimum(location, 1 - location)
 

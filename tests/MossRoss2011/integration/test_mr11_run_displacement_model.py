@@ -55,9 +55,9 @@ def test_run_model(results_data):
 
         # Computed values
         results = run_model(
-            magnitude=np.asarray([magnitude]),
-            location=np.asarray([location]),
-            percentile=np.asarray([percentile]),
+            magnitude=magnitude,
+            location=location,
+            percentile=percentile,
             submodel=model,
         )
 

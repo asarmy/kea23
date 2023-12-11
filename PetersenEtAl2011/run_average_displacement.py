@@ -70,7 +70,7 @@ def run_ad(
 
     Raises (inherited from `run_displacement_model.py`)
     ------
-    TypeError
+    ValueError
         If invalid `submodel` is provided.
 
     Warns  (inherited from `run_displacement_model.py`)

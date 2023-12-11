@@ -458,7 +458,7 @@ def run_model(
 
     Raises
     ------
-    TypeError
+    ValueError
         If invalid `submodel` is provided.
 
     Warns
@@ -499,9 +499,9 @@ def run_model(
             f"Invalid submodel names: {invalid_submodels}. Supported submodels are {supported_submodels}."
         )
 
-    # Convert inputs to numpy arrays
+    # Convert inputs to list-like numpy arrays
     magnitude, location, percentile, submodel = map(
-        np.array, (magnitude, location, percentile, submodel)
+        np.atleast_1d, (magnitude, location, percentile, submodel)
     )
 
     # Calculate and organize results

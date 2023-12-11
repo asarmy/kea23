@@ -132,7 +132,7 @@ def run_model(
 
     Raises
     ------
-    TypeError
+    ValueError
         If invalid `submodel` is provided.
 
     Warns

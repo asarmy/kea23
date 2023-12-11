@@ -23,7 +23,7 @@ RTOL = 1e-2
 def test_calc(load_data_as_recarray):
     for row in load_data_as_recarray:
         # Inputs
-        magnitude = np.asarray([row[0]])
+        magnitude = row[0]
         style = row[1]
 
         # Expected
