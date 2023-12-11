@@ -9,10 +9,6 @@ implemented herein currently.
 # NOTE: This script just loops over locations in `run_displacement_model.py`
 
 Reference: https://doi.org/10.1785/0120100035
-
-# TODO: There is a potential issue with the bilinear model. Because the standard deviation changes
-across l/L', there is a weird step in any profile that is not median. Confirm this is a model
-issue and not misunderstanding in implementation.
 """
 
 

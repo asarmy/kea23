@@ -126,8 +126,8 @@ def run_ad(
 
     type_dict = {
         "magnitude": float,
-        "style": str,
         "model_name": str,
+        "style": str,
         "avg_displ": float,
     }
     dataframe = pd.DataFrame(np.column_stack(values), columns=type_dict.keys())
