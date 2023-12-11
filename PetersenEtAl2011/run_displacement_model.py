@@ -94,6 +94,7 @@ def run_model(
     percentile: Union[float, int, List[Union[float, int]], np.ndarray],
     submodel: Union[str, List[str], np.ndarray] = "elliptical",
     style: Union[str, List[str], np.ndarray] = "strike-slip",
+    debug_bilinear_model: bool = False,
 ) -> pd.DataFrame:
     """
     Run PEA11 principal fault displacement model. All parameters must be passed as keyword
@@ -116,6 +117,13 @@ def run_model(
 
     style : Union[str, list, numpy.ndarray], optional
         Style of faulting (case-insensitive). Default is "strike-slip".
+
+    debug_bilinear_model : bool, optional
+        If True, bilinear model will run for any percentile with a UserWarning. If False, bilinear
+        model results will be dropped for every percentile except median. Default False.
+
+        # NOTE: There is an issue with the bilinear model. The standard deviation changes across
+        ... l/L' and Figure 5b in PEA11 cannot be reproduced.
 
     Returns
     -------
@@ -227,6 +235,24 @@ def run_model(
     dataframe = pd.DataFrame(np.column_stack(results), columns=cols_dict.keys())
     dataframe = dataframe.astype(cols_dict)
 
+    # FIXME: There is an issue with the bilinear model. The standard deviation changes across ...
+    # ... l/L' and Figure 5b in PEA11 cannot be reproduced; issue UserWarning on this.
+    if np.any(submodel == "bilinear") and np.any(percentile != 0.5):
+        if debug_bilinear_model:
+            warnings.warn(
+                "#FIXME: Don't use the bilinear model for anything except median 50th percentile; current code does not reproduce Fig 5b in P11."
+            )
+        else:
+            warnings.warn(
+                "#FIXME: There is a problem with how the bilinear model is currently implemented for anything except median 50th percentile, so these have been dropped from your analysis."
+            )
+            dataframe = dataframe[
+                ~(
+                    dataframe["model_name"].str.contains("bilinear")
+                    & (dataframe["percentile"] != 0.5)
+                )
+            ].reset_index(drop=True)
+
     return dataframe
 
 
@@ -293,6 +319,15 @@ def main():
         help="Style of faulting (case-insensitive). Default is 'strike-slip'; other styles not recommended.",
     )
 
+    # FIXME: bilinear model debugger issue
+    parser.add_argument(
+        "--debug",
+        dest="debug_bilinear_model",
+        action="store_true",
+        help="Return bilinear results that are erroneous for debugging purposes.",
+        default=False,
+    )
+
     args = parser.parse_args()
 
     magnitude = args.magnitude
@@ -300,6 +335,7 @@ def main():
     percentile = args.percentile
     submodel = args.submodel
     style = args.style
+    debug = args.debug_bilinear_model  # FIXME: bilinear model debugger issue
 
     try:
         results = run_model(
@@ -308,6 +344,7 @@ def main():
             percentile=percentile,
             submodel=submodel,
             style=style,
+            debug_bilinear_model=debug,  # FIXME: bilinear model debugger issue
         )
         print(results)
 

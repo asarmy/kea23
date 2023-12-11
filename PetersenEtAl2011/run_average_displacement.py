@@ -40,6 +40,7 @@ def run_ad(
     magnitude: Union[float, int, List[Union[float, int]], np.ndarray],
     submodel: Union[str, List[str], np.ndarray] = "elliptical",
     style: Union[str, List[str], np.ndarray] = "strike-slip",
+    debug_bilinear_model: bool = False,
 ) -> pd.DataFrame:
     """
     Run PEA11 principal fault displacement model to calculate the average displacement that is
@@ -55,9 +56,15 @@ def run_ad(
         PEA11 shape model name  (case-insensitive). Default is "elliptical". Valid options are
         "elliptical", "quadratic", or "bilinear".
 
-
     style : Union[str, list, numpy.ndarray], optional
         Style of faulting (case-insensitive). Default is "strike-slip".
+
+    debug_bilinear_model : bool, optional
+        If True, bilinear model will run for any percentile with a UserWarning. If False, bilinear
+        model results will be dropped for every percentile except median. Default False.
+
+        # NOTE: There is an issue with the bilinear model. The standard deviation changes across
+        ... l/L' and Figure 5b in PEA11 cannot be reproduced.
 
     Returns
     -------
@@ -100,6 +107,7 @@ def run_ad(
         submodel=submodel,
         style=style,
         location_step=0.01,
+        debug_bilinear_model=debug_bilinear_model,  # FIXME: bilinear model debugger issue
     )
 
     # Group by magnitude and submodel shape
@@ -179,14 +187,28 @@ def main():
         help="Style of faulting (case-insensitive). Default is 'strike-slip'; other styles not recommended.",
     )
 
+    # FIXME: bilinear model debugger issue
+    parser.add_argument(
+        "--debug",
+        dest="debug_bilinear_model",
+        action="store_true",
+        help="Return bilinear results that are erroneous for debugging purposes.",
+        default=False,
+    )
     args = parser.parse_args()
 
     magnitude = args.magnitude
     submodel = args.submodel
     style = args.style
+    debug = args.debug_bilinear_model  # FIXME: bilinear model debugger issue
 
     try:
-        results = run_ad(magnitude=magnitude, submodel=submodel, style=style)
+        results = run_ad(
+            magnitude=magnitude,
+            submodel=submodel,
+            style=style,
+            debug_bilinear_model=debug,  # FIXME: bilinear model debugger issue
+        )
         print(results)
 
         # Prompt to save results to CSV

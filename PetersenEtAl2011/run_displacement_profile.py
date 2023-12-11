@@ -39,6 +39,7 @@ def run_profile(
     submodel: Union[str, List[str], np.ndarray] = "elliptical",
     style: Union[str, List[str], np.ndarray] = "strike-slip",
     location_step: float = 0.05,
+    debug_bilinear_model: bool = False,
 ) -> pd.DataFrame:
     """
     Run PEA11 principal fault displacement model to create slip profile. All parameters must be
@@ -62,6 +63,13 @@ def run_profile(
 
     location_step : float, optional
         Profile step interval in percentage. Default 0.05.
+
+    debug_bilinear_model : bool, optional
+        If True, bilinear model will run for any percentile with a UserWarning. If False, bilinear
+        model results will be dropped for every percentile except median. Default False.
+
+        # NOTE: There is an issue with the bilinear model. The standard deviation changes across
+        ... l/L' and Figure 5b in PEA11 cannot be reproduced.
 
     Returns
     -------
@@ -110,6 +118,7 @@ def run_profile(
         percentile=percentile,
         submodel=submodel,
         style=style,
+        debug_bilinear_model=debug_bilinear_model,  # FIXME: bilinear model debugger issue
     )
 
     return dataframe.sort_values(
@@ -179,6 +188,15 @@ def main():
         help="Profile step interval in percentage. Default 0.05.",
     )
 
+    # FIXME: bilinear model debugger issue
+    parser.add_argument(
+        "--debug",
+        dest="debug_bilinear_model",
+        action="store_true",
+        help="Return bilinear results that are erroneous for debugging purposes.",
+        default=False,
+    )
+
     args = parser.parse_args()
 
     magnitude = args.magnitude
@@ -186,6 +204,7 @@ def main():
     submodel = args.submodel
     style = args.style
     location_step = args.location_step
+    debug = args.debug_bilinear_model  # FIXME: bilinear model debugger issue
 
     try:
         results = run_profile(
@@ -194,6 +213,7 @@ def main():
             submodel=submodel,
             style=style,
             location_step=location_step,
+            debug_bilinear_model=debug,  # FIXME: bilinear model debugger issue
         )
         print(results)
 
