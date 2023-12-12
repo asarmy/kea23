@@ -442,19 +442,14 @@ def main():
         type=float,
         help=" Aleatory quantile value. Use -1 for mean.",
     )
+
     parser.add_argument(
-        "--mean_model",
-        dest="mean_model",
-        action="store_true",
-        help="Use mean model coefficients (default).",
-    )
-    parser.add_argument(
-        "--no-mean_model",
+        "--full-model",
         dest="mean_model",
         action="store_false",
-        help="Use full model coefficients.",
+        help="Use full model coefficients. Default uses mean model coefficients.",
+        default=True,
     )
-    parser.set_defaults(mean_model=True)
 
     args = parser.parse_args()
 
