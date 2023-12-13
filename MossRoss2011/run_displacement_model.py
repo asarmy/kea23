@@ -1,9 +1,9 @@
 """This file runs the MR11 principal fault displacement model.
 - Any number of scenarios are allowed (e.g., user can enter multiple magnitudes).
 - The results are returned in a pandas DataFrame.
-- Results for with full aleatory variability and with location-only aleatory variability are always returned.
+- Results with full aleatory variability and with location-only aleatory variability are always returned.
 - The results with full aleatory variability are computed by convolving distributions for normalized
-displacement (based on magnitude) and normalizat ratio (based on location) using the Monte Carlo sampling
+displacement (based on magnitude) and normalization ratio (based on location) using the Monte Carlo sampling
 method described in Moss and Ross (2011).
 - Only the principal fault displacement models are implemented herein currently.
 - Command-line use is supported; try `python run_displacement_model.py --help`
@@ -52,7 +52,7 @@ def _calc_distribution_params_and_samples(*, magnitude, location, percentile, su
     A vectorized helper function to do the following:
         (1) Calculate predicted distribution parameters for normalized displacement based on magnitude.
         (2) Calculate predicted distribution parameters for normalization ratio based on location.
-        (3) Perform Monte Carlo sampling on each distribution (N=100000).
+        (3) Perform Monte Carlo sampling on each distribution (N=500000).
         (4) Broadcast results for all combinations of magnitude, location, and percentile.
         (5) Return results in a dictionary.
 
@@ -101,6 +101,10 @@ def _calc_distribution_params_and_samples(*, magnitude, location, percentile, su
     ------
     TypeError
         If more than one value is provided for `submodel`.
+
+    Notes
+    ------
+    N=500,000 was chosen because it is still reasonably fast and produces smooth slip profiles.
     """
 
     # Check for only one submodel
