@@ -1,14 +1,4 @@
-"""This file defines the plot style for plots used in the report.
-
-Functions
--------
-add_minor_gridlines
-    See help(plot_style.add_minor_gridlines)
-
-Requirements
-------------
-import matplotlib.pyplot as plt
-"""
+"""This file defines the plot style for plots used in the report."""
 
 
 import matplotlib.pyplot as plt

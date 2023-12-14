@@ -22,6 +22,13 @@ model_colors = {
     "WC94-rv": colors.get("lightgreen"),
     "WC94-nm": colors.get("lightgreen"),
     "KEA23": colors.get("black"),
+    "PEA11-ellip": colors.get("lightred"),
+    "PEA11-quad": colors.get("lightred"),
+    "PEA11-bilin": colors.get("lightred"),
+    "MR11-d_ad": colors.get("lightblue"),
+    "MR11-d_md": colors.get("darkblue"),
+    "YEA03": colors.get("orange"),
+    "YEA03-d_ad": colors.get("orange"),
 }
 
 model_linestyles = {
@@ -32,6 +39,13 @@ model_linestyles = {
     "WC94-rv": "dashdot",
     "WC94-nm": "dashdot",
     "KEA23": "solid",
+    "PEA11-ellip": (0, (6, 2)),
+    "PEA11-quad": (0, (3, 1)),
+    "PEA11-bilin": "dashdot",
+    "MR11-d_ad": (0, (6, 2)),
+    "MR11-d_md": "dashdot",
+    "YEA03-d_ad": (0, (3, 1)),
+    "YEA03": (0, (3, 1)),
 }
 
 model_labels = {
@@ -42,4 +56,11 @@ model_labels = {
     "WC94-rv": "WC94 (RV)",
     "WC94-nm": "WC94 (NM)",
     "KEA23": "KEA23",
+    "PEA11-ellip": "PEA11 Elliptical",
+    "PEA11-quad": "PEA11 Quadratic",
+    "PEA11-bilin": "PEA11 Bilinear",
+    "MR11-d_ad": "MR11 D/AD",
+    "MR11-d_md": "MR11 D/MD",
+    "YEA03-d_ad": "YEA03 D/AD",
+    "YEA03": "YEA03",
 }

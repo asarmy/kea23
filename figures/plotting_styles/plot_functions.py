@@ -66,3 +66,45 @@ def plot_mag_scaling(dict_of_dataframes):
     ax_obj.legend(loc="lower right")
 
     return figure, ax_obj
+
+
+# def plot_profiles(kuehn_dataframe):
+
+# figure, ax_obj = plt.subplots()
+
+# x, model = "location", "KEA23"
+# color = myplot.model_colors.get(model)
+# linestyles = ["dashed", "dashed", "solid"]
+# lineweights = [0.75, 0.75, 1.1]
+# y_vals = ["displ_site", "displ_complement", "displ_folded"]
+# labels = ["KEA23 Unfolded", None, "KEA23 Folded"]
+# for _y, _ls, _lw, _lab in zip(y_vals, linestyles, lineweights, labels):
+# ax_obj.plot(kuehn_dataframe[x], kuehn_dataframe[_y], c=color, ls=_ls, lw=_lw, label=_lab)
+
+# ax_obj.set(xlabel="$U_*$", ylabel="Median Displacement (m)")
+# ax_obj.set(xlim=[0,1], ylim=[0.1, 3], yscale="log")
+# ax_obj.yaxis.set_major_formatter(ticker.FormatStrFormatter("%g"))
+# add_minor_gridlines(ax_obj, axis="both")
+
+# return figure, ax_obj
+
+
+def plot_profiles_rev(kuehn_dataframe):
+
+    figure, ax_obj = plt.subplots()
+
+    x, model = "location", "KEA23"
+    color = myplot.model_colors.get(model)
+    linestyles = ["dashed", "dashed", "solid"]
+    lineweights = [0.75, 0.75, 1.1]
+    y_vals = ["normalized_displ_site", "normalized_displ_complement", "normalized_displ_folded"]
+    labels = ["KEA23 Unfolded", None, "KEA23 Folded"]
+    for _y, _ls, _lw, _lab in zip(y_vals, linestyles, lineweights, labels):
+        ax_obj.plot(kuehn_dataframe[x], kuehn_dataframe[_y], c=color, ls=_ls, lw=_lw, label=_lab)
+
+    ax_obj.set(xlabel="$U_*$", ylabel="Mean D/AD")
+    ax_obj.set(xlim=[0, 1], ylim=[0.1, 3], yscale="log")
+    ax_obj.yaxis.set_major_formatter(ticker.FormatStrFormatter("%g"))
+    add_minor_gridlines(ax_obj, axis="both")
+
+    return figure, ax_obj

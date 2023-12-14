@@ -7,6 +7,7 @@ import pandas as pd
 # Module imports
 import proj_setup
 import plot_functions
+import plot_style  # noqa: F401
 
 # Data imports
 RESULTS_FILES = {

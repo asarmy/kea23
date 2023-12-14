@@ -1,0 +1,47 @@
+""" """
+
+# Python imports
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Module imports
+import proj_setup
+import plot_functions
+import plot_style  # noqa: F401
+import plot_definitions as myplot
+
+# Data imports
+RESULTS_FILES = {
+    "KEA23": "kea23_nm_profile.csv",
+    "PEA11": "pea11_elliptical_profile.csv",
+}
+
+df_kea = pd.read_csv(proj_setup.RESULTS_DIR / RESULTS_FILES["KEA23"])
+df_pea = pd.read_csv(proj_setup.RESULTS_DIR / RESULTS_FILES["PEA11"])
+
+STYLE = "Strike-Slip"
+
+# Plotting
+
+# This sets up plot style and plots KEA results
+fig, ax = plot_functions.plot_profiles_rev(df_kea)
+
+# Plot style-specific results
+model = "PEA11"
+ax.plot(
+    df_pea["location"],
+    df_pea["normalized_displ"],
+    c=myplot.model_colors.get(model),
+    ls=myplot.model_linestyles.get(model),
+    label=myplot.model_labels.get(model),
+    zorder=10,
+)
+
+ax.set_title(STYLE)
+ax.legend(loc="lower center")
+
+# Save
+fout = f"{STYLE}_profiles.png"
+fout = proj_setup.PLOTS_DIR / fout
+plt.savefig(fout, bbox_inches="tight")
+plt.close(fig)
