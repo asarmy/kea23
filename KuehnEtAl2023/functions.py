@@ -1,9 +1,6 @@
 """This file contains helper various functions used to calculate the model predictions in
 transformed units.
 
-# NOTE: The `func_ss`, `func_rv`, and `func_nm` functions are called in the main
-function in `run_model()`.
-
 Reference: https://doi.org/10.1177/ToBeAssigned
 """
 
