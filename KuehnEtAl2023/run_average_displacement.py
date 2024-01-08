@@ -99,8 +99,8 @@ def run_ad(
 
     values = (
         list(magnitudes),
-        list(model_numbers),
         list(styles),
+        list(model_numbers),
         list(area_values),
     )
 

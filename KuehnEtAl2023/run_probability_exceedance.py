@@ -1,14 +1,12 @@
-"""This file runs the KEA23 displacement model.
+"""This file runs hazard (probability of exceedance) for the KEA23 displacement model.
 - The results are returned in a pandas DataFrame.
 - Results for the location, its complement, and folded location are always returned.
 - The mean model (i.e., mean coefficients) is run by default, but results for all coefficients can be computed.
 - If full model is run (i.e., `mean_model=False`), then only one scenario is allowed.
-- A scenario is defined as a magnitude-location-style-percentile combination.
+- A scenario is defined as a magnitude-location-style combination.
 - If mean model is run (i.e., `mean_model=True` or default), then any number of scenarios is allowed.
-- Command-line use is supported; try `python run_displacement_model.py --help`
-- Module use is supported; try `from run_displacement_model import run_model`
-
-# NOTE: Several helper functions are defined herein, but the main function is `run_model()`.
+- Command-line use is supported; try `python run_probability_exceedance.py --help`
+- Module use is supported; try `from run_probability_exceedance import run_probex`
 
 Reference: https://doi.org/10.1177/ToBeAssigned
 """
@@ -35,89 +33,21 @@ import KuehnEtAl2023.model_config as model_config  # noqa: F401
 from KuehnEtAl2023.params import _calculate_distribution_parameters
 
 
-def _calculate_Y(*, mu, sigma, lam, percentile):
-    """
-    A vectorized helper function to calculate predicted displacement in transformed units.
-
-    Parameters
-    ----------
-    mu : np.array
-        Mean prediction in transformed units.
-
-    sigma : np.array
-        Total standard deviation in transformed units.
-
-    lam : np.array
-        "Lambda" transformation parameter in Box-Cox transformation.
-
-    percentile : np.array
-        Aleatory quantile value. Use -1 for mean.
-
-    Returns
-    -------
-    Y : np.array
-        Predicted displacement in transformed units.
-    """
-    if np.any(percentile == -1):
-        # Compute the mean
-        # NOTE: Analytical solution from https://robjhyndman.com/hyndsight/backtransforming/
-        D_mean = (np.power(lam * mu + 1, 1 / lam)) * (
-            1 + (np.power(sigma, 2) * (1 - lam)) / (2 * np.power(lam * mu + 1, 2))
-        )
-        # NOTE: Analytical soluion is in meters, so convert back to Y transform for consistency
-        Y_mean = (np.power(D_mean, lam) - 1) / lam
-    else:
-        Y_mean = np.nan
-
-    # Compute the aleatory quantile
-    Y_normal = stats.norm.ppf(percentile, loc=mu, scale=sigma)
-
-    # Use np.where for vectorization
-    Y = np.where(percentile == -1, Y_mean, Y_normal)
-
-    return Y
-
-
-def _calculate_displacement(*, predicted_Y, lam):
-    """
-    A vectorized helper function to calculate predicted displacement in meters.
-
-    Parameters
-    ----------
-    predicted_Y : np.array
-        Predicted displacement in transformed units.
-
-    lam : np.array
-        "Lambda" transformation parameter in Box-Cox transformation.
-
-    Returns
-    -------
-    D : np.array
-        Predicted displacement in meters.
-    """
-
-    D = np.power(predicted_Y * lam + 1, 1 / lam)
-
-    # Handle values that are too small to calculate
-    D = np.where(np.isnan(D), 0, D)
-
-    return D
-
-
-def run_model(
+def run_probex(
     *,
     magnitude: Union[float, int, List[Union[float, int]], np.ndarray],
     location: Union[float, int, List[Union[float, int]], np.ndarray],
     style: Union[str, List[str], np.ndarray],
-    percentile: Union[str, List[str], np.ndarray],
+    displacement: Union[float, int, List[Union[float, int]], np.ndarray],
     mean_model: bool = True,
 ) -> pd.DataFrame:
     """
-    Run KEA23 displacement model. All parameters must be passed as keyword arguments.
+    Calculate hazard, in the form of probability of exceedance, using the KEA23 displacement model.
+    All parameters must be passed as keyword arguments.
     A couple "gotchas":
         If full model is run (i.e., `mean_model=False`), then only one scenario is allowed.
         If mean model is run (i.e., `mean_model=True` or default), then any number of scenarios is allowed.
-        A scenario is defined as a magnitude-location-style-percentile combination.
+        A scenario is defined as a magnitude-location-style combination.
 
     Parameters
     ----------
@@ -131,8 +61,8 @@ def run_model(
         Style of faulting (case-insensitive). Valid options are 'strike-slip', 'reverse', or
         'normal'.
 
-    percentile : Union[float, list, numpy.ndarray]
-        Aleatory quantile value. Use -1 for mean.
+    displacement : Union[float, list, numpy.ndarray]
+        Test values of displacement in meters.
 
     mean_model : bool, optional
         If True, use mean coefficients. If False, use full coefficients. Default True.
@@ -144,19 +74,17 @@ def run_model(
         - 'magnitude': Earthquake moment magnitude [from user input].
         - 'location':  Normalized location along rupture length [from user input].
         - 'style': Style of faulting [from user input].
-        - 'percentile': Aleatory quantile value [from user input].
         - 'model_number': Model coefficient row number. Returns -1 for mean model.
         - 'lambda': Box-Cox transformation parameter.
         - 'mu_site': Mean transformed displacement for the location.
         - 'sigma_site': Standard deviation transformed displacement for the location.
         - 'mu_complement': Mean transformed displacement for the complementary location.
         - 'sigma_complement': Standard deviation transformed displacement for the complementary location.
-        - 'Y_site': Transformed displacement for the location.
-        - 'Y_complement': Transformed displacement for the complementary location.
-        - 'Y_folded': Transformed displacement for the folded location.
-        - 'displ_site': Displacement in meters for the location.
-        - 'displ_complement': Displacement in meters for the complementary location.
-        - 'displ_folded': Displacement in meters for the folded location.
+        - 'transformed_displacement': Transformed displacement test value.
+        - 'displacement': Displacement test value in meters [from user input].
+        - 'probex_site': Probability of exceedance for the location.
+        - 'probex_complement': Probability of exceedance for the complementary location.
+        - 'probex_folded': Equally-weighted probability of exceedance for site and complement.
 
     Raises
     ------
@@ -164,18 +92,17 @@ def run_model(
         If the provided `style` is not one of the supported styles.
 
     TypeError
-        If more than one value is provided for `magnitude`, `location`, `style`, or `percentile` when `mean_model=False`.
+        If more than one value is provided for `magnitude`, `location`, or `style` when `mean_model=False`.
 
     Notes
     ------
     Command-line interface usage
-        Run (e.g.) `python run_displacement_model.py --magnitude 7 --location 0.5 --style strike-slip --percentile 0.5 0.84`
-        Run `python run_displacement_model.py --help`
+        Run (e.g.) `run_probability_exceedance.py --magnitude 7 --location 0.5 --style strike-slip --displacement 0.01 0.03 0.1 0.3 1 3 10 30`
+        Run `python rrun_probability_exceedance.py --help`
 
     #TODO
     ------
     Raise a ValueError for invalid location
-    Raise a ValueError for invalid percentile.
     Raise a UserWarning for magntiudes outside recommended ranges.
     """
 
@@ -196,7 +123,6 @@ def run_model(
         scenario_dict = {
             "magnitude": magnitude,
             "location": location,
-            "percentile": percentile,
             "style": style,
         }
         for key, value in scenario_dict.items():
@@ -210,10 +136,9 @@ def run_model(
     scenarios = product(
         [magnitude] if not isinstance(magnitude, (list, np.ndarray)) else magnitude,
         [location] if not isinstance(location, (list, np.ndarray)) else location,
-        [percentile] if not isinstance(percentile, (list, np.ndarray)) else percentile,
         [style] if not isinstance(style, (list, np.ndarray)) else style,
     )
-    magnitude, location, percentile, style = map(np.array, zip(*scenarios))
+    magnitude, location, style = map(np.array, zip(*scenarios))
 
     # Get distribution parameters for site and complement
     mu_site, sigma_site, lam, model_number = _calculate_distribution_parameters(
@@ -226,69 +151,101 @@ def run_model(
         mean_model=mean_model,
     )
 
-    # Calculate Y (transformed displacement)
-    Y_site = _calculate_Y(mu=mu_site, sigma=sigma_site, lam=lam, percentile=percentile)
-    Y_complement = _calculate_Y(
-        mu=mu_complement, sigma=sigma_complement, lam=lam, percentile=percentile
-    )
-    Y_folded = np.mean([Y_site, Y_complement], axis=0)
+    # Arrange scenarios and displacements for element-wise calculations
+    # TODO: will need to change this approach if more than one scenario is allowed for full model
+    if not mean_model:
+        n_models = len(model_number)
+        magnitude = np.repeat(magnitude, n_models)
+        location = np.repeat(location, n_models)
+        style = np.repeat(style, n_models)
 
-    # Calculate displacement in meters
-    displ_site = _calculate_displacement(predicted_Y=Y_site, lam=lam)
-    displ_complement = _calculate_displacement(predicted_Y=Y_complement, lam=lam)
-    displ_folded = _calculate_displacement(predicted_Y=Y_folded, lam=lam)
+    n_scenarios = len(magnitude)
+    n_displacements = len(np.atleast_1d(displacement))
+
+    _arrays = [
+        magnitude,
+        location,
+        style,
+        mu_site,
+        sigma_site,
+        lam,
+        model_number,
+        mu_complement,
+        sigma_complement,
+    ]
+
+    _repeated_arrays = [np.repeat(arr, n_displacements) for arr in _arrays]
+
+    # Unpack
+    (
+        magnitude,
+        location,
+        style,
+        mu_site,
+        sigma_site,
+        lam,
+        model_number,
+        mu_complement,
+        sigma_complement,
+    ) = _repeated_arrays
+
+    displacement = np.tile(displacement, n_scenarios)
+
+    # Calculate probability of exceedance
+    transformed_displ = (displacement**lam - 1) / lam
+    probex_site = 1 - stats.norm.cdf(x=transformed_displ, loc=mu_site, scale=sigma_site)
+    probex_complement = 1 - stats.norm.cdf(
+        x=transformed_displ, loc=mu_complement, scale=sigma_complement
+    )
+    probex_folded = np.mean((probex_site, probex_complement), axis=0)
 
     # Create a DataFrame
-    # NOTE: number of rows will be controlled by number of scenarios (if mean model) or number of coefficients (if full model)
-    n = max(len(magnitude), len(mu_site))
     results = (
-        np.full(n, magnitude),
-        np.full(n, location),
-        np.full(n, style),
-        np.full(n, percentile),
+        magnitude,
+        location,
+        style,
         [int(x) for x in model_number],
         lam,
         mu_site,
         sigma_site,
         mu_complement,
         sigma_complement,
-        Y_site,
-        Y_complement,
-        Y_folded,
-        displ_site,
-        displ_complement,
-        displ_folded,
+        transformed_displ,
+        displacement,
+        probex_site,
+        probex_complement,
+        probex_folded,
     )
 
     type_dict = {
         "magnitude": float,
         "location": float,
         "style": str,
-        "percentile": float,
         "model_number": int,
         "lambda": float,
         "mu_site": float,
         "sigma_site": float,
         "mu_complement": float,
         "sigma_complement": float,
-        "Y_site": float,
-        "Y_complement": float,
-        "Y_folded": float,
-        "displ_site": float,
-        "displ_complement": float,
-        "displ_folded": float,
+        "transformed_displacement": float,
+        "displacement": float,
+        "probex_site": float,
+        "probex_complement": float,
+        "probex_folded": float,
     }
     dataframe = pd.DataFrame(np.column_stack(results), columns=type_dict.keys())
     dataframe = dataframe.astype(type_dict)
 
-    return dataframe
+    return dataframe.sort_values(
+        by=["model_number", "magnitude", "style", "location", "displacement"]
+    ).reset_index(drop=True)
 
 
 def main():
-    description_text = """Run KEA23 displacement model. A couple "gotchas":
-        If full model is run (i.e., `--no-mean_model`), then only one scenario is allowed.
-        If mean model is run (i.e., `--mean_model` or default), then any number of scnearios is allowed.
-        A scenario is defined as a magnitude-location-style-percentile combination.
+    description_text = """Calculate hazard, in the form of probability of exceedance, using the KEA23 displacement model. A couple "gotchas":
+        If full model is run (i.e., `mean_model=False`), then only one scenario is allowed.
+        If mean model is run (i.e., `mean_model=True` or default), then any number of scenarios is allowed.
+        A scenario is defined as a magnitude-location-style combination.
 
     Returns
     -------
@@ -297,19 +254,17 @@ def main():
         - 'magnitude': Earthquake moment magnitude [from user input].
         - 'location':  Normalized location along rupture length [from user input].
         - 'style': Style of faulting [from user input].
-        - 'percentile': Aleatory quantile value [from user input].
         - 'model_number': Model coefficient row number. Returns -1 for mean model.
         - 'lambda': Box-Cox transformation parameter.
         - 'mu_site': Mean transformed displacement for the location.
         - 'sigma_site': Standard deviation transformed displacement for the location.
         - 'mu_complement': Mean transformed displacement for the complementary location.
         - 'sigma_complement': Standard deviation transformed displacement for the complementary location.
-        - 'Y_site': Transformed displacement for the location.
-        - 'Y_complement': Transformed displacement for the complementary location.
-        - 'Y_folded': Transformed displacement for the folded location.
-        - 'displ_site': Displacement in meters for the location.
-        - 'displ_complement': Displacement in meters for the complementary location.
-        - 'displ_folded': Displacement in meters for the folded location.
+        - 'transformed_displacement': Transformed displacement test value.
+        - 'displacement': Displacement test value in meters [from user input].
+        - 'probex_site': Probability of exceedance for the location.
+        - 'probex_complement': Probability of exceedance for the complementary location.
+        - 'probex_folded': Equally-weighted probability of exceedance for site and complement.
     """
 
     parser = argparse.ArgumentParser(
@@ -341,12 +296,12 @@ def main():
         help="Style of faulting (case-insensitive).",
     )
     parser.add_argument(
-        "-p",
-        "--percentile",
+        "-d",
+        "--displacement",
         required=True,
         nargs="+",
         type=float,
-        help="Aleatory quantile value. Use -1 for mean.",
+        help="Test values of displacement in meters.",
     )
 
     parser.add_argument(
@@ -362,15 +317,15 @@ def main():
     magnitude = args.magnitude
     location = args.location
     style = args.style
-    percentile = args.percentile
+    displacement = args.displacement
     mean_model = args.mean_model
 
     try:
-        results = run_model(
+        results = run_probex(
             magnitude=magnitude,
             location=location,
             style=style,
-            percentile=percentile,
+            displacement=displacement,
             mean_model=mean_model,
         )
         print(results)

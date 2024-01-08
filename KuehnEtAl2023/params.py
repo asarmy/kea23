@@ -1,6 +1,9 @@
 """This file contains the helper functions to calculate the statistical distribution parameters
 (i.e., mu and sigma).
 
+# NOTE: The `_calculate_distribution_parameters` function is called in the main
+functions in `run_model()` and `run_probex()`.
+
 Reference: https://doi.org/10.1177/ToBeAssigned
 """
 
